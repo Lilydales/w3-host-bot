@@ -12,33 +12,33 @@ fn yes_joins_only_an_existing_unambiguous_vote_with_distinct_voters() {
     let mut commands = LobbyCommands::default();
     let settings = CommandSettings::default();
     commands.observe(Some(&lobby()), 0);
-    assert!(text(commands.handle(&chat("Player1", "?yes"), &settings, 1)).contains("No matching"));
-    commands.handle(&chat("Player1", "?votestart"), &settings, 2);
+    assert!(text(commands.handle(&chat("Player1", "!yes"), &settings, 1)).contains("No matching"));
+    commands.handle(&chat("Player1", "!votestart"), &settings, 2);
     assert!(
         !commands
-            .handle(&chat("Player1", "?yes"), &settings, 3)
+            .handle(&chat("Player1", "!yes"), &settings, 3)
             .start
     );
-    commands.handle(&chat("Player1", "?votekick Player3"), &settings, 4);
-    assert!(text(commands.handle(&chat("Player2", "?yes"), &settings, 5)).contains("Two votes"));
+    commands.handle(&chat("Player1", "!votekick Player3"), &settings, 4);
+    assert!(text(commands.handle(&chat("Player2", "!yes"), &settings, 5)).contains("Two votes"));
     assert!(
         commands
-            .handle(&chat("Player2", "?yes KICK"), &settings, 6)
+            .handle(&chat("Player2", "!yes KICK"), &settings, 6)
             .kick
             .is_some()
     );
     assert!(
         commands
-            .handle(&chat("Player2", "?yes START"), &settings, 7)
+            .handle(&chat("Player2", "!yes START"), &settings, 7)
             .start
     );
     commands.observe(Some(&lobby()), 62);
-    assert!(text(commands.handle(&chat("Player2", "?yes"), &settings, 62)).contains("No matching"));
-    commands.handle(&chat("Player1", "?votestart"), &settings, 63);
+    assert!(text(commands.handle(&chat("Player2", "!yes"), &settings, 62)).contains("No matching"));
+    commands.handle(&chat("Player1", "!votestart"), &settings, 63);
     let mut disabled = settings;
     disabled.set(ChatCommand::VoteStart, false);
     commands.apply_settings(&disabled);
-    assert!(text(commands.handle(&chat("Player2", "?yes"), &disabled, 64)).contains("No matching"));
+    assert!(text(commands.handle(&chat("Player2", "!yes"), &disabled, 64)).contains("No matching"));
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn commands_from_different_players_in_the_same_millisecond_both_respond() {
     for player in ["Player1", "Player2", "Player4"] {
         assert!(
             commands
-                .handle_at(&chat(player, "?help"), &settings, 1000, Context::default())
+                .handle_at(&chat(player, "!help"), &settings, 1000, Context::default())
                 .reply
                 .is_some()
         );
@@ -57,7 +57,7 @@ fn commands_from_different_players_in_the_same_millisecond_both_respond() {
     assert!(
         commands
             .handle_at(
-                &chat("Player1", "?map"),
+                &chat("Player1", "!map"),
                 &settings,
                 1199,
                 Context::default()
@@ -68,7 +68,7 @@ fn commands_from_different_players_in_the_same_millisecond_both_respond() {
     assert!(
         commands
             .handle_at(
-                &chat("Player1", "?map"),
+                &chat("Player1", "!map"),
                 &settings,
                 1200,
                 Context::default()
@@ -76,7 +76,7 @@ fn commands_from_different_players_in_the_same_millisecond_both_respond() {
             .reply
             .is_some()
     );
-    let mut other_room = chat("Player3", "?map");
+    let mut other_room = chat("Player3", "!map");
     other_room["payload"]["message"]["channelName"] = json!("Another lobby");
     assert!(
         commands
@@ -99,21 +99,21 @@ fn region_map_and_help_use_available_data_without_exposing_paths() {
     let mut commands = LobbyCommands::default();
     commands.observe(Some(&roster), 0);
     let settings = CommandSettings::default();
-    let response = text(commands.handle(&chat("Player1", "?from"), &settings, 1));
+    let response = text(commands.handle(&chat("Player1", "!from"), &settings, 1));
     assert!(response.contains("Player1: Europe") && response.contains("Player2: Americas"));
     assert!(response.contains("Twin#3: unknown") && !response.contains("Computer"));
     assert!(
-        text(commands.handle(&chat("Player1", "?from Twin"), &settings, 2)).contains("ambiguous")
+        text(commands.handle(&chat("Player1", "!from Twin"), &settings, 2)).contains("ambiguous")
     );
     assert!(
-        text(commands.handle(&chat("Player1", "?from Twin#3"), &settings, 3))
+        text(commands.handle(&chat("Player1", "!from Twin#3"), &settings, 3))
             .contains("Twin#3: unknown")
     );
-    let response = text(commands.handle(&chat("Player1", "?map"), &settings, 4));
+    let response = text(commands.handle(&chat("Player1", "!map"), &settings, 4));
     assert!(response.contains("Survival Chaos v1.59") && response.contains("Survival v1.59.w3x"));
     assert!(!response.contains("PrivateUser"));
     assert!(
-        text(commands.handle(&chat("Player1", "?help yes"), &settings, 5)).contains("?yes start")
+        text(commands.handle(&chat("Player1", "!help yes"), &settings, 5)).contains("!yes start")
     );
 }
 

@@ -57,6 +57,16 @@ pub(super) fn run(
     let mut start_requested = None;
     let mut kick_requested: Option<(crate::commands::KickTarget, u64, kick::RefreshGate)> = None;
     let mut manual_kick = kick::PendingKick::default();
+    let mut bans = crate::bans::BanList::open(engine.config.ban_path.as_deref());
+    let mut ban_enforcer = kick::BanEnforcer::default();
+    let mut ban_checked = 0;
+    if let Some(path) = bans.path() {
+        let _ = tx.send(Event::Activity(Activity::Command(format!(
+            "Ban list · {} · {} banned",
+            path.display(),
+            bans.len()
+        ))));
+    }
     let mut slot_edit = slots::PendingSlot::default();
     loop {
         let step = supervision::attempt(|| -> Result<Step, String> {
@@ -155,6 +165,35 @@ pub(super) fn run(
             }
             if let Some(Control::Kick(target)) = &control {
                 manual_kick.request(target.clone(), &engine, now);
+            }
+            if let Some(Control::Ban(target)) = &control {
+                let line = match bans.add(target.name()) {
+                    Ok(true) => format!("Banned · {}", target.name()),
+                    Ok(false) => format!("Already banned · {}", target.name()),
+                    Err(error) => error,
+                };
+                let _ = tx.send(Event::Activity(Activity::Command(line)));
+                // Remove them now even if the list could not be saved.
+                manual_kick.request(target.clone(), &engine, now);
+            }
+            if now != ban_checked {
+                ban_checked = now;
+                bans.reload();
+            }
+            if let Some(warning) = bans.warning() {
+                let _ = tx.send(Event::Activity(Activity::Command(warning)));
+            }
+            if identity_ok
+                && manual_kick.idle()
+                && engine.phase == Phase::Lobby
+                && let Some(lobby) = engine.owned_lobby(now)
+                && let Some(target) = ban_enforcer.next(lobby, &bans, now)
+                && manual_kick.request(target.clone(), &engine, now).is_some()
+            {
+                let _ = tx.send(Event::Activity(Activity::Command(format!(
+                    "Banned player removed · {}",
+                    target.name()
+                ))));
             }
             if let Some(Control::EditSlot(request)) = &control {
                 slot_edit.request(request.clone(), &engine, now);

@@ -224,7 +224,11 @@ fn lobby(app: &App) -> Element<'_, Message> {
                 let target = lobby.kick_target(slot.number);
                 item = item.push(super::widgets::optional_action(
                     "Kick",
-                    target.map(Message::Kick),
+                    target.clone().map(Message::Kick),
+                ));
+                item = item.push(super::widgets::optional_action(
+                    "Ban",
+                    target.map(Message::Ban),
                 ));
             }
             players = players.push(container(item).padding([9, 0]));

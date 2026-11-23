@@ -14,7 +14,7 @@ impl Default for Welcome {
     fn default() -> Self {
         Self {
             enabled: true,
-            message: "Welcome to this automatic lobby #{playername}, please type ?help to see the different options".into(),
+            message: "Welcome to this automatic lobby #{playername}, please type !help to see the different options".into(),
         }
     }
 }

@@ -23,24 +23,24 @@ fn majority_excludes_self_observers_and_ai_and_counts_each_player_once() {
     for sender in ["Player0", "Player4", "Player5", "Unknown"] {
         assert!(
             commands
-                .handle(&chat(sender, "?votestart"), &settings, 1)
+                .handle(&chat(sender, "!votestart"), &settings, 1)
                 .reply
                 .is_none()
         );
     }
     assert!(
         !commands
-            .handle(&chat("Player1", "?votestart"), &settings, 1)
+            .handle(&chat("Player1", "!votestart"), &settings, 1)
             .start
     );
     assert!(
         !commands
-            .handle(&chat("Player1", "?votestart"), &settings, 2)
+            .handle(&chat("Player1", "!votestart"), &settings, 2)
             .start
     );
     assert!(
         commands
-            .handle(&chat("Player2", "?votestart"), &settings, 2)
+            .handle(&chat("Player2", "!votestart"), &settings, 2)
             .start
     );
 }
@@ -52,34 +52,34 @@ fn disabled_commands_external_channels_and_spoofed_text_are_ignored() {
     settings.set(ChatCommand::VoteStart, false);
     assert!(
         commands
-            .handle(&chat("Player1", "?votestart"), &settings, 1)
+            .handle(&chat("Player1", "!votestart"), &settings, 1)
             .reply
             .is_none()
     );
-    let mut whisper = chat("Player1", "?help");
+    let mut whisper = chat("Player1", "!help");
     whisper["payload"]["message"]["source"] = json!("whisper");
     assert!(commands.handle(&whisper, &settings, 2).reply.is_none());
     assert!(
         commands
-            .handle(&chat("Player1", "Player2: ?help"), &settings, 3)
+            .handle(&chat("Player1", "Player2: !help"), &settings, 3)
             .reply
             .is_none()
     );
     assert!(
         commands
-            .handle(&chat("Player1", "!help"), &settings, 4)
+            .handle(&chat("Player1", "?help"), &settings, 4)
             .reply
             .is_none()
     );
     assert!(
         !commands
-            .handle(&chat("Player1", "?help"), &settings, 5)
+            .handle(&chat("Player1", "!help"), &settings, 5)
             .reply
             .unwrap()
             .payload["content"]
             .as_str()
             .unwrap()
-            .contains("?votestart")
+            .contains("!votestart")
     );
 }
 #[test]
@@ -88,17 +88,17 @@ fn votes_expire_and_cannot_pass_on_departure_or_cross_lobbies() {
     let settings = CommandSettings::default();
     let mut roster = lobby();
     commands.observe(Some(&roster), 0);
-    commands.handle(&chat("Player1", "?votestart"), &settings, 1);
+    commands.handle(&chat("Player1", "!votestart"), &settings, 1);
     commands.observe(Some(&roster), 61);
     assert!(
         !commands
-            .handle(&chat("Player2", "?votestart"), &settings, 61)
+            .handle(&chat("Player2", "!votestart"), &settings, 61)
             .start
     );
     roster.players.retain(|p| p.name != "Player3");
     commands.observe(Some(&roster), 62);
     assert!(commands.votes.is_empty());
-    commands.handle(&chat("Player1", "?votestart"), &settings, 63);
+    commands.handle(&chat("Player1", "!votestart"), &settings, 63);
     roster.lobby_name = "Test #2".into();
     commands.observe(Some(&roster), 64);
     assert!(commands.votes.is_empty());
@@ -110,10 +110,10 @@ fn withdrawing_a_start_vote_does_not_start_a_game() {
     let mut commands = LobbyCommands::default();
     let settings = CommandSettings::default();
     commands.observe(Some(&lobby()), 0);
-    commands.handle(&chat("Player1", "?votestart"), &settings, 1);
+    commands.handle(&chat("Player1", "!votestart"), &settings, 1);
     assert!(
         !commands
-            .handle(&chat("Player1", "?votecancel"), &settings, 2)
+            .handle(&chat("Player1", "!votecancel"), &settings, 2)
             .start
     );
     assert!(commands.votes.is_empty());
@@ -128,38 +128,38 @@ fn help_explains_enabled_commands_without_changing_votes_with_a_blank_host() {
     let mut commands = LobbyCommands::default();
     commands.observe(Some(&roster), 0);
     let mut settings = CommandSettings::default();
-    commands.handle(&chat("Player1", "?votestart"), &settings, 1);
-    commands.handle(&chat("Player1", "?votekick Player3"), &settings, 2);
+    commands.handle(&chat("Player1", "!votestart"), &settings, 1);
+    commands.handle(&chat("Player1", "!votekick Player3"), &settings, 2);
     let votes = commands.votes.clone();
     let kick_voters = commands.kick.as_ref().unwrap().voters.clone();
     for now in [3, 4] {
-        let result = commands.handle(&chat("Player2", "?help"), &settings, now);
+        let result = commands.handle(&chat("Player2", "!help"), &settings, now);
         assert!(!result.start && result.kick.is_none());
         let reply = result.reply.unwrap();
         assert_eq!(reply.message, "SendGameChatMessage");
         let text = reply.payload["content"].as_str().unwrap();
         assert!(text.starts_with("Commands: "));
-        assert!(text.contains("?votestart"));
-        assert!(text.contains("?votekick"));
-        assert!(text.contains("?help <command>"));
+        assert!(text.contains("!votestart"));
+        assert!(text.contains("!votekick"));
+        assert!(text.contains("!help <command>"));
         assert!(text.len() <= 240);
         assert_eq!(commands.votes, votes);
         assert_eq!(commands.kick.as_ref().unwrap().voters, kick_voters);
     }
     settings.set(ChatCommand::VoteKick, false);
     let reply = commands
-        .handle(&chat("Player2", "?help"), &settings, 5)
+        .handle(&chat("Player2", "!help"), &settings, 5)
         .reply
         .unwrap();
     assert!(
         !reply.payload["content"]
             .as_str()
             .unwrap()
-            .contains("?votekick")
+            .contains("!votekick")
     );
     assert!(
         commands
-            .handle(&chat("", "?help"), &settings, 6)
+            .handle(&chat("", "!help"), &settings, 6)
             .reply
             .is_none()
     );
@@ -174,13 +174,13 @@ fn kick_needs_distinct_votes_and_a_fresh_matching_target() {
     for now in [1, 2] {
         assert!(
             commands
-                .handle(&chat("Player1", "?votekick Player3"), &settings, now)
+                .handle(&chat("Player1", "!votekick Player3"), &settings, now)
                 .kick
                 .is_none()
         );
     }
     let target = commands
-        .handle(&chat("Player2", "?votekick Player3"), &settings, 3)
+        .handle(&chat("Player2", "!votekick Player3"), &settings, 3)
         .kick
         .unwrap();
     let kick = target.confirm(&roster).unwrap();
@@ -203,7 +203,7 @@ fn kick_rejects_self_observers_ai_small_rosters_and_ambiguous_names() {
         let mut commands = LobbyCommands::default();
         commands.observe(Some(&lobby()), 0);
         commands.handle(
-            &chat("Player1", &format!("?votekick {target}")),
+            &chat("Player1", &format!("!votekick {target}")),
             &settings,
             1,
         );
@@ -214,13 +214,13 @@ fn kick_rejects_self_observers_ai_small_rosters_and_ambiguous_names() {
     roster.players[3].name = "Twin#2".into();
     let mut commands = LobbyCommands::default();
     commands.observe(Some(&roster), 0);
-    commands.handle(&chat("Player1", "?votekick Twin"), &settings, 1);
+    commands.handle(&chat("Player1", "!votekick Twin"), &settings, 1);
     assert!(commands.kick.is_none());
-    commands.handle(&chat("Player1", "?votekick Twin#1"), &settings, 2);
+    commands.handle(&chat("Player1", "!votekick Twin#1"), &settings, 2);
     assert!(commands.kick.is_some());
     roster.players.remove(3);
     commands.observe(Some(&roster), 3);
-    commands.handle(&chat("Player1", "?votekick Twin#1"), &settings, 3);
+    commands.handle(&chat("Player1", "!votekick Twin#1"), &settings, 3);
     assert!(commands.kick.is_none());
 }
 
@@ -229,9 +229,9 @@ fn a_pending_kick_is_cancelled_if_a_voter_leaves_or_changes_identity() {
     let mut commands = LobbyCommands::default();
     let settings = CommandSettings::default();
     commands.observe(Some(&lobby()), 0);
-    commands.handle(&chat("Player1", "?votekick Player3"), &settings, 1);
+    commands.handle(&chat("Player1", "!votekick Player3"), &settings, 1);
     let target = commands
-        .handle(&chat("Player2", "?votekick Player3"), &settings, 2)
+        .handle(&chat("Player2", "!votekick Player3"), &settings, 2)
         .kick
         .unwrap();
     for change in 0..4 {
@@ -271,8 +271,8 @@ fn live_disabling_clears_votes_and_old_ready_settings_migrate() {
     assert!(!serde_json::to_string(&settings).unwrap().contains("ready"));
     let mut commands = LobbyCommands::default();
     commands.observe(Some(&lobby()), 0);
-    commands.handle(&chat("Player1", "?votestart"), &settings, 1);
-    commands.handle(&chat("Player1", "?votekick Player3"), &settings, 2);
+    commands.handle(&chat("Player1", "!votestart"), &settings, 1);
+    commands.handle(&chat("Player1", "!votekick Player3"), &settings, 2);
     settings.set(ChatCommand::VoteStart, false);
     settings.set(ChatCommand::VoteKick, false);
     commands.apply_settings(&settings);
@@ -280,7 +280,7 @@ fn live_disabling_clears_votes_and_old_ready_settings_migrate() {
     settings.set(ChatCommand::VoteKick, true);
     assert!(
         commands
-            .handle(&chat("Player2", "?votekick Player3"), &settings, 3)
+            .handle(&chat("Player2", "!votekick Player3"), &settings, 3)
             .kick
             .is_none()
     );
@@ -292,7 +292,7 @@ fn live_disabling_clears_votes_and_old_ready_settings_migrate() {
     assert!(
         commands
             .handle(
-                &chat("Player1", "?votestart"),
+                &chat("Player1", "!votestart"),
                 &CommandSettings::default(),
                 66
             )

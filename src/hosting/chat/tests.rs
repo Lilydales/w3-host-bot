@@ -46,7 +46,7 @@ fn informational_commands_respond_during_countdown_but_color_does_not_mutate_it(
     engine.start_now(1);
     let mut chat = Chat::new(None);
     let mut actions = Vec::new();
-    for (i, command) in ["?status", "?from", "?map", "?stats"].iter().enumerate() {
+    for (i, command) in ["!status", "!from", "!map", "!stats"].iter().enumerate() {
         let outcome = chat.process(
             &engine,
             Some(&message(command)),
@@ -64,7 +64,7 @@ fn informational_commands_respond_during_countdown_but_color_does_not_mutate_it(
     assert!(actions.iter().all(|c| c.message == "SendGameChatMessage"));
     chat.process(
         &engine,
-        Some(&message("?color blue")),
+        Some(&message("!color blue")),
         true,
         Duration::from_secs(4),
         &mut actions,
@@ -83,7 +83,7 @@ fn color_requires_a_fresh_matching_player_and_native_ack_before_success() {
     let mut actions = Vec::new();
     chat.process(
         &engine,
-        Some(&message("?color blue")),
+        Some(&message("!color blue")),
         true,
         Duration::from_secs(1),
         &mut actions,
@@ -162,9 +162,9 @@ fn unread_chat_does_not_delay_departure_cancellation_and_replies_survive_the_bur
         let mut socket = tungstenite::accept(stream).unwrap();
         rx.recv_timeout(Duration::from_secs(5)).unwrap();
         let began = Instant::now();
-        let mut second = message("?map");
+        let mut second = message("!map");
         second["payload"]["message"]["sender"] = json!("Second");
-        for event in [message("?help"), second, departed] {
+        for event in [message("!help"), second, departed] {
             socket
                 .send(Message::Text(event.to_string().into()))
                 .unwrap();
@@ -248,7 +248,7 @@ fn unacknowledged_color_expires_without_stopping_the_hosting_engine() {
     let mut actions = Vec::new();
     chat.process(
         &engine,
-        Some(&message("?color blue")),
+        Some(&message("!color blue")),
         true,
         Duration::from_secs(1),
         &mut actions,

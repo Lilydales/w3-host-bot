@@ -1,9 +1,11 @@
 use super::{Slot, Snapshot};
 use crate::{
+    bans::BanList,
     engine::{Engine, Phase},
     protocol::{Command, Lobby},
 };
 use serde_json::json;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KickRequest {
@@ -36,6 +38,32 @@ impl Slot {
 }
 
 impl KickRequest {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// The first banned player who can be removed from this lobby right now.
+    fn banned(lobby: &Lobby, bans: &BanList, ready: impl Fn(i64) -> bool) -> Option<Self> {
+        if !lobby.is_host {
+            return None;
+        }
+        lobby.players.iter().find_map(|p| {
+            let id = p.id.filter(|id| *id >= 0 && *id != 255)?;
+            (p.slot_status == 2
+                && p.slot_type == 0
+                && !p.is_self
+                && !p.name.trim().is_empty()
+                && bans.is_banned(&p.name)
+                && ready(id))
+            .then(|| Self {
+                lobby: lobby.lobby_name.clone(),
+                slot: p.slot,
+                id,
+                name: p.name.clone(),
+            })
+        })
+    }
+
     fn matches(&self, lobby: &Lobby) -> bool {
         lobby.is_host
             && lobby
@@ -83,10 +111,32 @@ impl RefreshGate {
     }
 }
 
+/// Picks banned players to remove, without retrying the same player every tick.
+#[derive(Default)]
+pub(super) struct BanEnforcer {
+    attempted: BTreeMap<i64, u64>,
+}
+
+impl BanEnforcer {
+    const RETRY_SECONDS: u64 = 4;
+
+    pub fn next(&mut self, lobby: &Lobby, bans: &BanList, now: u64) -> Option<KickRequest> {
+        self.attempted
+            .retain(|_, at| now.saturating_sub(*at) < Self::RETRY_SECONDS);
+        let target = KickRequest::banned(lobby, bans, |id| !self.attempted.contains_key(&id))?;
+        self.attempted.insert(target.id, now);
+        Some(target)
+    }
+}
+
 #[derive(Default)]
 pub(super) struct PendingKick(Option<(KickRequest, u64, RefreshGate)>);
 
 impl PendingKick {
+    pub fn idle(&self) -> bool {
+        self.0.is_none()
+    }
+
     pub fn request(&mut self, target: KickRequest, engine: &Engine, now: u64) -> Option<()> {
         if engine.phase != Phase::Lobby
             || !engine.owned_lobby(now).is_some_and(|l| target.matches(l))
@@ -149,3 +199,7 @@ pub(super) fn invalidate_vote(
         *pending = None;
     }
 }
+
+#[cfg(test)]
+#[path = "ban_tests.rs"]
+mod ban_tests;

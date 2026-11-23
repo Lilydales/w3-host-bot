@@ -174,7 +174,7 @@ fn a_passed_vote_stays_cancelled_after_a_join_then_departure_during_refresh() {
         event(
             "ChatMessage",
             json!({"message":{
-        "source":"gameChat","sender":sender,"content":"?votekick Player3"}}),
+        "source":"gameChat","sender":sender,"content":"!votekick Player3"}}),
         )
     };
     chat.handle(&message("Player1"), &settings, 2);

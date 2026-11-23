@@ -72,11 +72,11 @@ fn help_and_counts_remain_available_during_native_countdown_without_accepting_vo
     engine.start_now(1);
     let mut chat = crate::commands::LobbyCommands::default();
     for (offset, command) in [
-        "?help",
-        "?players",
-        "?votestart",
-        "?votecancel",
-        "?votekick Player",
+        "!help",
+        "!players",
+        "!votestart",
+        "!votecancel",
+        "!votekick Player",
     ]
     .into_iter()
     .enumerate()
@@ -97,18 +97,18 @@ fn help_and_counts_remain_available_during_native_countdown_without_accepting_vo
         );
         assert!(!outcome.start && outcome.kick.is_none());
         assert_eq!(outcome.reply.is_some(), offset < 2, "{command}");
-        if command == "?help" {
+        if command == "!help" {
             let reply = outcome.reply.unwrap();
             let content = reply.payload["content"].as_str().unwrap();
             assert!(content.starts_with("Commands: "));
-            assert!(content.contains("?help") && content.contains("?players"));
-            assert!(!content.contains("?votestart"));
+            assert!(content.contains("!help") && content.contains("!players"));
+            assert!(!content.contains("!votestart"));
         }
     }
     let message = event(
         "ChatMessage",
         json!({"message":{
-            "source":"gameChat","sender":"Player","content":"?help"
+            "source":"gameChat","sender":"Player","content":"!help"
         }}),
     );
     assert!(

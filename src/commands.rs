@@ -232,7 +232,7 @@ impl LobbyCommands {
                     "Vote passed. Starting the countdown.".into()
                 } else {
                     format!(
-                        "Start vote: {}/{} needed. Vote with ?votestart.",
+                        "Start vote: {}/{} needed. Vote with !votestart.",
                         self.votes.len(),
                         required
                     )
@@ -277,7 +277,7 @@ impl LobbyCommands {
                 let kick_active = self.kick.is_some() && settings.enabled(ChatCommand::VoteKick);
                 match argument.to_ascii_lowercase().as_str() {
                     "" if start_active && kick_active => {
-                        "Two votes are active. Use ?yes start or ?yes kick.".into()
+                        "Two votes are active. Use !yes start or !yes kick.".into()
                     }
                     "" | "start" if start_active && argument != "kick" => {
                         self.votes.insert(key.clone());
@@ -286,7 +286,7 @@ impl LobbyCommands {
                             "Vote passed. Starting the countdown.".into()
                         } else {
                             format!(
-                                "Start vote: {}/{} needed. Vote with ?yes.",
+                                "Start vote: {}/{} needed. Vote with !yes.",
                                 self.votes.len(),
                                 required
                             )
@@ -299,7 +299,7 @@ impl LobbyCommands {
                         reply
                     }
                     "" | "start" | "kick" => "No matching vote is active.".into(),
-                    _ => "Use ?yes, ?yes start or ?yes kick.".into(),
+                    _ => "Use !yes, !yes start or !yes kick.".into(),
                 }
             }
         };
@@ -330,7 +330,7 @@ impl LobbyCommands {
                     .is_some_and(|short| short.eq_ignore_ascii_case(name))
         });
         let Some(target) = matches.next().cloned() else {
-            return ("Use ?votekick <player name>.".into(), None);
+            return ("Use !votekick <player name>.".into(), None);
         };
         if matches.next().is_some() {
             return (
@@ -369,7 +369,7 @@ impl LobbyCommands {
         } else {
             (
                 format!(
-                    "Kick {}: {}/{} votes. Use ?votekick {}.",
+                    "Kick {}: {}/{} votes. Use !votekick {}.",
                     target.name,
                     vote.voters.len(),
                     needed,

@@ -78,7 +78,7 @@ pub(super) fn request(lobby: &Lobby, sender: &str, name: &str) -> (String, Optio
         .position(|c| *c == normalized)
         .map(|c| c as u8)
     else {
-        return (format!("Use ?color <{}>.", COLORS.join("|")), None);
+        return (format!("Use !color <{}>.", COLORS.join("|")), None);
     };
     let Some(player) = lobby
         .players

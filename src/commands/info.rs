@@ -6,7 +6,7 @@ pub(super) fn help(settings: &CommandSettings, argument: &str) -> String {
         return ChatCommand::parse(argument)
             .filter(|c| settings.enabled(*c))
             .map(|c| format!("{}: {}", c.name(), c.description()))
-            .unwrap_or_else(|| "Unknown or disabled command. Use ?help.".into());
+            .unwrap_or_else(|| "Unknown or disabled command. Use !help.".into());
     }
     let list = ChatCommand::ALL
         .into_iter()
@@ -14,7 +14,7 @@ pub(super) fn help(settings: &CommandSettings, argument: &str) -> String {
         .map(ChatCommand::name)
         .collect::<Vec<_>>()
         .join(" ");
-    format!("Commands: {list}. Use ?help <command> for details.")
+    format!("Commands: {list}. Use !help <command> for details.")
 }
 
 pub(super) fn regions(lobby: &Lobby, argument: &str) -> String {
@@ -32,7 +32,7 @@ pub(super) fn regions(lobby: &Lobby, argument: &str) -> String {
         })
         .collect();
     if players.is_empty() {
-        return "Player not found. Use ?from [full BattleTag].".into();
+        return "Player not found. Use !from [full BattleTag].".into();
     }
     if !argument.is_empty() && players.len() > 1 {
         return "That name is ambiguous. Use the full BattleTag.".into();

@@ -42,17 +42,17 @@ impl ChatCommand {
 
     pub fn name(self) -> &'static str {
         match self {
-            Self::VoteStart => "?votestart",
-            Self::VoteCancel => "?votecancel",
-            Self::VoteKick => "?votekick",
-            Self::Players => "?players",
-            Self::Help => "?help",
-            Self::Status => "?status",
-            Self::Yes => "?yes",
-            Self::From => "?from",
-            Self::Map => "?map",
-            Self::Color => "?color",
-            Self::Stats => "?stats",
+            Self::VoteStart => "!votestart",
+            Self::VoteCancel => "!votecancel",
+            Self::VoteKick => "!votekick",
+            Self::Players => "!players",
+            Self::Help => "!help",
+            Self::Status => "!status",
+            Self::Yes => "!yes",
+            Self::From => "!from",
+            Self::Map => "!map",
+            Self::Color => "!color",
+            Self::Stats => "!stats",
         }
     }
 
@@ -70,23 +70,23 @@ impl ChatCommand {
             }
             Self::VoteCancel => "Withdraw your start and kick votes before they pass.",
             Self::VoteKick => {
-                "Use ?votekick <name>. At least 3 players; a majority of the other players must agree within 60 seconds."
+                "Use !votekick <name>. At least 3 players; a majority of the other players must agree within 60 seconds."
             }
             Self::Players => "Show the player and start vote counts.",
-            Self::Help => "List enabled commands. Use ?help <command> for details.",
+            Self::Help => "List enabled commands. Use !help <command> for details.",
             Self::Status => "Show the start condition, waiting reason and current votes.",
-            Self::Yes => "Join the active vote. Use ?yes start or ?yes kick if both are active.",
-            Self::From => "Use ?from [name] to show Battle.net regions, not countries.",
+            Self::Yes => "Join the active vote. Use !yes start or !yes kick if both are active.",
+            Self::From => "Use !from [name] to show Battle.net regions, not countries.",
             Self::Map => "Show the current map name and file, including its version when present.",
-            Self::Color => "Use ?color <color> to change your own color when the map allows it.",
+            Self::Color => "Use !color <color> to change your own color when the map allows it.",
             Self::Stats => {
-                "Use ?stats [name] for games started here and first/last seen dates (UTC)."
+                "Use !stats [name] for games started here and first/last seen dates (UTC)."
             }
         }
     }
 
     pub fn parse(word: &str) -> Option<Self> {
-        let word = word.trim().trim_start_matches('?');
+        let word = word.trim().trim_start_matches('!');
         Self::ALL
             .into_iter()
             .find(|c| c.name()[1..].eq_ignore_ascii_case(word))

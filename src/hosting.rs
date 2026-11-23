@@ -45,6 +45,7 @@ pub enum Control {
     Settings(LiveSettings),
     Slot { slot: u8, open: bool },
     Kick(KickRequest),
+    Ban(KickRequest),
     EditSlot(SlotRequest),
     Reserved { number: u32, saved: bool },
 }

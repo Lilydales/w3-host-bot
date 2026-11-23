@@ -61,6 +61,7 @@ pub enum Message {
     Start,
     Slot(ghost_reforged::hosting::SlotRequest),
     Kick(ghost_reforged::hosting::KickRequest),
+    Ban(ghost_reforged::hosting::KickRequest),
     PollHost,
     CloseRequested(iced::window::Id),
     Browse,
@@ -360,6 +361,11 @@ impl App {
             Message::Kick(target) => {
                 if let Some(worker) = &self.worker {
                     worker.send(Control::Kick(target));
+                }
+            }
+            Message::Ban(target) => {
+                if let Some(worker) = &self.worker {
+                    worker.send(Control::Ban(target));
                 }
             }
             Message::PollHost => {

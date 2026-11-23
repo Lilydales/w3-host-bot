@@ -24,6 +24,13 @@ impl App {
             auto_start: true,
             commands: p.commands,
             stats_path: Some(self.data_directory.join("players.json")),
+            ban_path: Some(ghost_reforged::bans::BanList::locate(
+                std::env::current_exe()
+                    .ok()
+                    .as_deref()
+                    .and_then(std::path::Path::parent),
+                &self.data_directory,
+            )),
             welcome: p.welcome,
             resume_lobby: true,
             // LobbyStart owns the game's native countdown. Never add a second one.
