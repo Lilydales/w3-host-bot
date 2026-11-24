@@ -14,7 +14,7 @@ mod shutdown;
 mod supervision;
 use crate::{
     background,
-    config::Config,
+    config::{Config, HostMode},
     engine::{Engine, Phase},
     host_identity::HostIdentity,
     protocol::{Command, Lobby},
@@ -103,6 +103,7 @@ impl Worker {
     pub fn start(config: Config) -> Result<Self, String> {
         config.validate().map_err(|e| e.to_string())?;
         config.ensure_supported().map_err(|e| e.to_string())?;
+        background::KEEP_VISIBLE.store(config.host_mode == HostMode::Player, Ordering::SeqCst);
         let (commands, rx) = mpsc::channel();
         let (tx, events) = mpsc::channel();
         let stop = Arc::new(AtomicBool::new(false));
@@ -167,7 +168,11 @@ fn publish_lobby(
 ) {
     let current = engine
         .owned_lobby(now)
-        .filter(|lobby| identity_ready && lobby.local().is_some_and(|p| p.is_observer))
+        .filter(|lobby| {
+            identity_ready
+                && (engine.config.host_mode == HostMode::Player
+                    || lobby.local().is_some_and(|p| p.is_observer))
+        })
         .map(|lobby| summarize(lobby, engine.can_start(now), engine.phase == Phase::Lobby));
     if *previous != current {
         let _ = tx.send(match &current {
