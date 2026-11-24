@@ -355,6 +355,7 @@ impl Engine {
                     }
                     self.phase = Phase::InGame;
                 }
+                Some("SCORE_SCREEN") if self.config.host_mode == HostMode::Player => {}
                 Some("SCORE_SCREEN") => {
                     self.finish_game(now);
                     return vec![
