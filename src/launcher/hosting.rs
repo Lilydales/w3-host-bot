@@ -13,7 +13,12 @@ impl App {
         let map = super::maps::validate(&map)?;
         let config = Config {
             maps: vec![map],
-            host_mode: HostMode::Observer,
+            host_mode: if p.player_host {
+                HostMode::Player
+            } else {
+                HostMode::Observer
+            },
+            count_host: p.player_host,
             lobby_name: p.lobby_pattern,
             first_number: p.next_number,
             min_players: p.players,
@@ -35,8 +40,8 @@ impl App {
             resume_lobby: true,
             // LobbyStart owns the game's native countdown. Never add a second one.
             countdown_seconds: 0,
-            leave_on_load: p.rehost,
-            restart_on_load: p.rehost,
+            leave_on_load: p.rehost && !p.player_host,
+            restart_on_load: p.rehost && !p.player_host,
             private_game: p.private_game,
             max_games: if p.rehost { 0 } else { 1 },
             ..Config::default()
