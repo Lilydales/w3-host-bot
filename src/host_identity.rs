@@ -19,7 +19,7 @@ pub(crate) trait SendFilter {
 }
 
 pub(crate) struct Identity<F: SendFilter> {
-    filter: F,
+    filter: Option<F>,
     creating: Option<Instant>,
 }
 
@@ -28,9 +28,17 @@ pub(crate) type HostIdentity = Identity<NativeFilter>;
 impl HostIdentity {
     pub fn open(pid: u32) -> Result<Self, String> {
         Ok(Self {
-            filter: NativeFilter::open(pid)?,
+            filter: Some(NativeFilter::open(pid)?),
             creating: None,
         })
+    }
+
+    /// Player mode: never touches the game's memory and accepts a named host.
+    pub fn passive() -> Self {
+        Self {
+            filter: None,
+            creating: None,
+        }
     }
 }
 
@@ -38,8 +46,10 @@ impl<F: SendFilter> Identity<F> {
     /// Call immediately before the native CreateLobby command, after reservation.
     pub fn begin_creation(&mut self) -> Result<(), String> {
         self.cancel_creation()?;
-        self.filter.install()?;
-        self.creating = Some(Instant::now());
+        if let Some(filter) = self.filter.as_mut() {
+            filter.install()?;
+            self.creating = Some(Instant::now());
+        }
         Ok(())
     }
 
@@ -57,12 +67,16 @@ impl<F: SendFilter> Identity<F> {
 
     /// Only accept a complete, freshly serialized lobby owned by this worker.
     pub fn confirm(&mut self, value: &Value) -> Result<bool, String> {
+        if self.filter.is_none() {
+            return Ok(value["isHost"] == true);
+        }
         if !Self::matches(value) {
             self.cancel_creation()?;
             return Err("The host name is not blank. Close this lobby, then click Host to create a new one.".into());
         }
         if self.creating.is_some() {
-            match self.filter.count()? {
+            let count = self.filter.as_ref().map_or(Ok(1), |f| f.count())?;
+            match count {
                 0 => return Ok(false), // An early blank placeholder is not proof.
                 1 => self.cancel_creation()?,
                 _ => {
@@ -86,7 +100,9 @@ impl<F: SendFilter> Identity<F> {
     }
 
     pub fn cancel_creation(&mut self) -> Result<(), String> {
-        self.filter.restore()?;
+        if let Some(filter) = self.filter.as_mut() {
+            filter.restore()?;
+        }
         self.creating = None;
         Ok(())
     }
@@ -94,7 +110,9 @@ impl<F: SendFilter> Identity<F> {
 
 impl<F: SendFilter> Drop for Identity<F> {
     fn drop(&mut self) {
-        let _ = self.filter.restore();
+        if let Some(filter) = self.filter.as_mut() {
+            let _ = filter.restore();
+        }
     }
 }
 
