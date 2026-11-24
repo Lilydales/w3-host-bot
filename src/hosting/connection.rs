@@ -165,7 +165,11 @@ fn open_once(
     game.hide_until(stop, deadline)?;
     let mut client = Client::connect(&endpoint).map_err(|e| e.to_string())?;
     if resources.identity.is_none() {
-        resources.identity = Some(HostIdentity::open(endpoint.pid)?);
+        resources.identity = Some(if config.host_mode == crate::config::HostMode::Player {
+            HostIdentity::passive()
+        } else {
+            HostIdentity::open(endpoint.pid)?
+        });
     }
     client
         .send("SendGameLobbySetup", json!({}))
