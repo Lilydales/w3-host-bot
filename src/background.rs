@@ -1,4 +1,8 @@
 //! Launch and window ownership are isolated from the hosting state machine.
+
+/// Set in Player mode so the game and launcher are neither hidden nor muted.
+pub static KEEP_VISIBLE: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 #[cfg(windows)]
 mod native {
     use std::{
