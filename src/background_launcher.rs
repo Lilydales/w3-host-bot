@@ -39,6 +39,9 @@ impl Launch {
     }
 
     pub(crate) fn poll(&mut self, stop: &AtomicBool, deadline: Instant) -> Result<(), String> {
+        if crate::background::KEEP_VISIBLE.load(Ordering::SeqCst) {
+            return Ok(());
+        }
         if self
             .polled
             .is_some_and(|at| at.elapsed() < Duration::from_secs(1))
