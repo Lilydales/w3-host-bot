@@ -107,9 +107,11 @@ pub(super) fn run(
                     .receive_with_timeout(Duration::from_millis(50))
                     .map_err(|e| e.to_string())?
             };
-            if event.as_ref().is_some_and(|e| {
-                e["messageType"] == "GameLobbySetup" && !HostIdentity::matches(&e["payload"])
-            }) {
+            if engine.config.host_mode != crate::config::HostMode::Player
+                && event.as_ref().is_some_and(|e| {
+                    e["messageType"] == "GameLobbySetup" && !HostIdentity::matches(&e["payload"])
+                })
+            {
                 identity_ok = false;
             }
             let repair_lobby =
