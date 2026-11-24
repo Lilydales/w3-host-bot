@@ -1,6 +1,6 @@
 //! Startup recovery keeps an unrelated or still-playing session intact.
 use crate::{
-    config::Config,
+    config::{Config, HostMode},
     protocol::{self, Lobby},
 };
 
@@ -28,7 +28,11 @@ pub fn resumable_lobby(config: &Config, lobby: &Lobby) -> Option<(u32, usize)> {
         && lobby.lobby_name == config.name(number)
         && lobby
             .local()
-            .is_some_and(|p| p.is_observer && p.slot_type == 0 && p.slot_status == 2))
+            .is_some_and(|p| {
+                (p.is_observer || config.host_mode == HostMode::Player)
+                    && p.slot_type == 0
+                    && p.slot_status == 2
+            }))
     .then_some((number, map_index))
 }
 
