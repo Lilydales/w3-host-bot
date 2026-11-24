@@ -27,11 +27,11 @@ use windows_sys::Win32::{
     },
 };
 
-const EXE_HASH: &str = "bd2a0dc256289de45287bb60f3725b88f1235216d5177984377fe1ca22840a12";
-const SDK_HASH: &str = "3a8762f6641f39da8099009adccfe1b2f9aa9613defe98273e38341de500b10e";
+const EXE_HASH: &str = "eb39ab298ae1d84d307aba4d400f2a7dbda2900a46964bb28aeba592f45fa97a";
+const SDK_HASH: &str = "04f798ac211b9fea1b741b4f1d520d7e5b3cf5f038241c909b7429b02a4cf134";
 const TABLE: usize = 0x7777b8;
 const METHODS: [usize; 9] = [
-    0xaa630, 0xabdc0, 0xaaa10, 0xaadb0, 0xabc70, 0xab220, 0xabc40, 0xab040, 0xaaad0,
+    0xaa730, 0xabec0, 0xaab10, 0xaaeb0, 0xabd70, 0xab320, 0xabd40, 0xab140, 0xaabd0,
 ];
 const SEND: usize = 7;
 const PAGE: usize = 4096;
