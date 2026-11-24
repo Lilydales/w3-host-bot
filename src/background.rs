@@ -204,6 +204,9 @@ mod native {
             stop: &AtomicBool,
             deadline: Instant,
         ) -> Result<(), String> {
+            if super::KEEP_VISIBLE.load(std::sync::atomic::Ordering::SeqCst) {
+                return Ok(());
+            }
             if self.audio.is_none() {
                 self.audio = Some(crate::background_audio::Guard::start(self.pid)?);
             }
