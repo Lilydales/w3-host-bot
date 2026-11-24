@@ -52,6 +52,11 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
             .on_toggle(Message::Rehost),
         if app.worker.is_none() {
             column![
+                toggler(profile.player_host)
+                    .label("Play as host (visible game)")
+                    .size(21)
+                    .text_size(14)
+                    .on_toggle(Message::PlayerHost),
                 toggler(profile.private_game)
                     .label("Private lobby")
                     .size(21)
