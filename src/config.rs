@@ -127,7 +127,7 @@ impl Default for MapSettings {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            expected_version: "3.0.0.24268".into(),
+            expected_version: "3.0.1.24371".into(),
             maps: Vec::new(),
             lobby_name: "GHost Rust #{n}".into(),
             first_number: 1,
