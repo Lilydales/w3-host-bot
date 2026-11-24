@@ -51,6 +51,7 @@ pub enum Message {
     Welcome(bool),
     Rehost(bool),
     Private(bool),
+    PlayerHost(bool),
     Speed(GameSpeed),
     RequireFull(bool),
     MapName,
@@ -287,6 +288,7 @@ impl App {
                 message,
                 Message::Edit(Field::Pattern | Field::Number, _)
                     | Message::Private(_)
+                    | Message::PlayerHost(_)
                     | Message::Speed(_)
                     | Message::MapName
                     | Message::Browse
@@ -411,6 +413,7 @@ impl App {
                 self.apply_settings();
             }
             Message::Private(value) => self.form.profile.private_game = value,
+            Message::PlayerHost(value) => self.form.profile.player_host = value,
             Message::Speed(value) => {
                 self.form.profile.speed = value;
                 self.motion.close_menus();
@@ -492,7 +495,11 @@ impl App {
             }
             Message::ProcessObserved(game) => {
                 if game.pid.is_some() || game.state == GameState::Stopped {
-                    self.audio.target(game.pid);
+                    self.audio.target(if self.form.profile.player_host {
+                        None
+                    } else {
+                        game.pid
+                    });
                 }
                 if let Some(error) = self.audio.error() {
                     self.log(&error);
