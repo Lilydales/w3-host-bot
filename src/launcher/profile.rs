@@ -31,6 +31,8 @@ pub struct Profile {
     pub rehost_delay_seconds: u64,
     #[serde(default)]
     pub empty_rehost_seconds: u64,
+    #[serde(default)]
+    pub player_host: bool,
 }
 
 fn rehost_delay() -> u64 {
@@ -91,6 +93,7 @@ impl Default for Profile {
             welcome: Default::default(),
             rehost_delay_seconds: rehost_delay(),
             empty_rehost_seconds: 0,
+            player_host: false,
         }
     }
 }
