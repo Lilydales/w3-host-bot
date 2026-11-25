@@ -3,7 +3,6 @@ name: Update Cargo.lock
 # One-off helper: Actions tab > "Update Cargo.lock" > Run workflow.
 # Adds any missing dependency entries to Cargo.lock (existing versions stay pinned)
 # and commits the result, so the --locked Windows build can pass.
-
 on:
   workflow_dispatch:
 
@@ -15,3 +14,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Resolve dependencies (no --locked, no updates to existing crates)
+        run: cargo metadata --format-version 1 > /dev/null
+
+      - name: Commit Cargo.lock
+        run: |
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock is already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "Update Cargo.lock for ureq"
+          git push
