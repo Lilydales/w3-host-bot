@@ -7,6 +7,7 @@ pub mod ds_report;
 pub mod engine;
 pub mod hosting;
 pub mod protocol;
+pub mod protocol_log;
 pub mod recovery;
 pub mod stats;
 pub mod transport;
