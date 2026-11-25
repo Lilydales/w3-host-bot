@@ -68,6 +68,8 @@ pub(super) fn run(
         ))));
     }
     let mut slot_edit = slots::PendingSlot::default();
+    let mut observer_trim = slots::ObserverTrim::default();
+    let mut ds = super::ds_check::DsCheck::default();
     loop {
         let step = supervision::attempt(|| -> Result<Step, String> {
             let game = resources
@@ -168,8 +170,8 @@ pub(super) fn run(
             if let Some(Control::Kick(target)) = &control {
                 manual_kick.request(target.clone(), &engine, now);
             }
-            if let Some(Control::Ban(target)) = &control {
-                let line = match bans.add(target.name()) {
+            if let Some(Control::Ban(target, reason)) = &control {
+                let line = match bans.add(target.name(), reason) {
                     Ok(true) => format!("Banned · {}", target.name()),
                     Ok(false) => format!("Already banned · {}", target.name()),
                     Err(error) => error,
@@ -197,6 +199,10 @@ pub(super) fn run(
                     target.name()
                 ))));
             }
+            ds.poll(&engine.config, now, tx, &mut announcements);
+            if identity_ok {
+                ds.kick(&engine, &mut manual_kick, now);
+            }
             if let Some(Control::EditSlot(request)) = &control {
                 slot_edit.request(request.clone(), &engine, now);
             }
@@ -213,6 +219,14 @@ pub(super) fn run(
             if let Some(line) = line {
                 let _ = tx.send(Event::Activity(Activity::Command(line)));
             }
+            commands.extend(observer_trim.next(
+                &engine,
+                now,
+                event
+                    .as_ref()
+                    .is_some_and(|e| e["messageType"] == "GameLobbySetup"),
+                identity_ok && manual_kick.idle() && slot_edit.idle(),
+            ));
             kick::invalidate_vote(&mut kick_requested, &engine, now);
             if let Some((_, _, gate)) = &mut kick_requested {
                 match gate.advance(
@@ -272,7 +286,24 @@ pub(super) fn run(
                 if let Activity::GameStarted(name) = &event {
                     chat.started(name);
                 }
-                track_announcement(&event, &mut announcements);
+                // Players with a BattleTag get a stats line instead of the welcome.
+                let looked_up = match &event {
+                    Activity::Joined(name) => {
+                        ds.join(&engine.config, engine.owned_lobby(now), name)
+                    }
+                    Activity::Left(name) => {
+                        ds.left(name);
+                        false
+                    }
+                    Activity::LobbyCreated(_) | Activity::GameStarted(_) => {
+                        ds.reset();
+                        false
+                    }
+                    Activity::Command(_) => false,
+                };
+                if !looked_up {
+                    track_announcement(&event, &mut announcements);
+                }
                 let _ = tx.send(Event::Activity(event));
             }
             if let Some(event) = &event {
@@ -365,7 +396,9 @@ pub(super) fn run(
             if identity_ok
                 && matches!(engine.phase, Phase::Lobby | Phase::Countdown(_))
                 && let Some(lobby) = engine.owned_lobby(now)
-                && let Some(command) = announcements.next(lobby, &engine.config.welcome, now)
+                && let Some(command) = announcements
+                    .next(lobby, &engine.config.welcome, now)
+                    .or_else(|| ds.message(lobby, engine.config.welcome.enabled, now))
             {
                 client
                     .send(command.message, command.payload)
@@ -450,6 +483,8 @@ pub(super) fn run(
         kick_requested = None;
         manual_kick = Default::default();
         slot_edit = Default::default();
+        observer_trim = Default::default();
+        ds.reset();
         chat.reset();
         deferred_controls
             .retain(|control| matches!(control, Control::Settings(_) | Control::StartRule { .. }));

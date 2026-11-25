@@ -12,10 +12,17 @@ fn lobby(host: bool, players: &[(i64, &str, u8, u8, bool)]) -> Lobby {
     .unwrap()
 }
 
+/// Builds a ban list from names, one per line (`//` lines are ignored), saved as JSON.
 fn bans(lines: &str) -> (BanList, tempfile::TempDir) {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join(crate::bans::FILE_NAME);
-    std::fs::write(&path, lines).unwrap();
+    let entries: Vec<_> = lines
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .map(|player| json!({"player": player, "reason": "test", "banned_at": 1}))
+        .collect();
+    std::fs::write(&path, serde_json::to_string(&entries).unwrap()).unwrap();
     (BanList::open(Some(&path)), directory)
 }
 
@@ -80,4 +87,32 @@ fn a_bare_name_ban_catches_any_tag_and_the_request_matches_the_live_lobby() {
         &[(0, "Me#1", 2, 0, true), (4, "griefer#8888", 2, 0, false)],
     );
     assert!(!target.matches(&moved));
+}
+
+#[test]
+fn a_confirmed_ban_with_a_reason_is_stored_and_then_enforced() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join(crate::bans::FILE_NAME);
+    let mut list = BanList::open(Some(&path));
+    let room = lobby(
+        true,
+        &[(0, "Me#1", 2, 0, true), (1, "Rude#5", 2, 0, false)],
+    );
+    assert!(BanEnforcer::default().next(&room, &list, 1).is_none());
+    assert_eq!(list.add("Rude#5", "insulted players"), Ok(true));
+    let target = BanEnforcer::default().next(&room, &list, 1).unwrap();
+    assert_eq!(target.name(), "Rude#5");
+    assert_eq!(list.get("Rude#5").unwrap().reason, "insulted players");
+    assert_eq!(BanList::open(Some(&path)).get("rude#5").unwrap().reason, "insulted players");
+}
+
+#[test]
+fn a_ban_without_a_reason_still_removes_the_player() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join(crate::bans::FILE_NAME);
+    let mut list = BanList::open(Some(&path));
+    let room = lobby(true, &[(1, "Quiet#2", 2, 0, false)]);
+    assert_eq!(list.add("Quiet#2", ""), Ok(true));
+    assert!(list.get("Quiet#2").unwrap().reason.is_empty());
+    assert!(BanEnforcer::default().next(&room, &list, 1).is_some());
 }

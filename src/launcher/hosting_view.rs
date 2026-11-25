@@ -10,7 +10,7 @@ use super::{
 };
 use iced::{
     Alignment, Element, Fill, Length,
-    widget::{column, container, row, scrollable, space, text},
+    widget::{column, container, row, scrollable, space, text, text_input},
 };
 
 pub fn view(app: &App) -> Element<'_, Message> {
@@ -197,10 +197,21 @@ fn lobby(app: &App) -> Element<'_, Message> {
             } else {
                 slot.name.clone()
             };
-            let mut item = row![
-                muted(format!("{:02}", slot.number + 1)).width(30),
-                text(name).size(15).width(Fill)
-            ]
+            let stats = (slot.status == 2 && !slot.computer)
+                .then(|| app.ds_stats.get(&slot.name))
+                .flatten();
+            let name: Element<'_, Message> = match stats {
+                Some(stats) => row![
+                    text(name).size(15),
+                    muted(ghost_reforged::ds_report::DsStats::badge(*stats))
+                ]
+                .spacing(8)
+                .align_y(Alignment::Center)
+                .width(Fill)
+                .into(),
+                None => text(name).size(15).width(Fill).into(),
+            };
+            let mut item = row![muted(format!("{:02}", slot.number + 1)).width(30), name]
             .spacing(8)
             .align_y(Alignment::Center);
             if slot.observer {
@@ -231,7 +242,14 @@ fn lobby(app: &App) -> Element<'_, Message> {
                     target.map(Message::Ban),
                 ));
             }
-            players = players.push(container(item).padding([9, 0]));
+            let mut entry = column![item].spacing(8);
+            if let Some((pending, reason)) = &app.ban_prompt
+                && slot.status == 2
+                && lobby.kick_target(slot.number).as_ref() == Some(pending)
+            {
+                entry = entry.push(ban_prompt(pending.name(), reason));
+            }
+            players = players.push(container(entry).padding([9, 0]));
         }
         (
             lobby.name.clone(),
@@ -316,4 +334,25 @@ fn lobby(app: &App) -> Element<'_, Message> {
         body = body.push(container(muted(&app.hosting_status)).padding([0, 24]));
     }
     effects::frame(container(body).height(Fill).style(p::panel))
+}
+
+/// Inline confirmation shown under a player's row after clicking "Ban".
+fn ban_prompt<'a>(player: &'a str, reason: &'a str) -> Element<'a, Message> {
+    let input = text_input("Reason (optional)", reason)
+        .on_input(Message::BanReason)
+        .on_submit(Message::ConfirmBan)
+        .padding([8, 14])
+        .size(15)
+        .style(p::input);
+    column![
+        muted(format!("Ban {player}? They will be removed and blocked from future lobbies.")),
+        effects::skin(input, Frame::Input),
+        row![
+            super::widgets::action("Confirm Ban", Message::ConfirmBan, true),
+            super::widgets::action("Cancel", Message::CancelBan, true),
+        ]
+        .spacing(9),
+    ]
+    .spacing(6)
+    .into()
 }

@@ -29,6 +29,9 @@ pub enum Field {
     RehostDelay,
     EmptyRefresh,
     Welcome,
+    DsPatch,
+    DsLevel,
+    DsMatches,
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +55,7 @@ pub enum Message {
     Rehost(bool),
     Private(bool),
     PlayerHost(bool),
+    ObserverSlots(u8),
     Speed(GameSpeed),
     RequireFull(bool),
     MapName,
@@ -62,7 +66,11 @@ pub enum Message {
     Start,
     Slot(ghost_reforged::hosting::SlotRequest),
     Kick(ghost_reforged::hosting::KickRequest),
+    /// Opens the inline ban confirmation; nothing is banned yet.
     Ban(ghost_reforged::hosting::KickRequest),
+    BanReason(String),
+    ConfirmBan,
+    CancelBan,
     PollHost,
     CloseRequested(iced::window::Id),
     Browse,
@@ -89,6 +97,8 @@ pub struct Form {
     pub players: String,
     pub rehost_delay: String,
     pub empty_refresh: String,
+    pub min_ds_level: String,
+    pub min_ds_matches: String,
 }
 
 impl Form {
@@ -98,6 +108,8 @@ impl Form {
             players: profile.players.to_string(),
             rehost_delay: profile.rehost_delay_seconds.to_string(),
             empty_refresh: profile.empty_rehost_seconds.to_string(),
+            min_ds_level: profile.min_ds_level.to_string(),
+            min_ds_matches: profile.min_ds_matches.to_string(),
             profile,
         }
     }
@@ -122,6 +134,16 @@ impl Form {
             .empty_refresh
             .parse()
             .map_err(|_| "Empty lobby refresh must be a whole number.")?;
+        p.min_ds_level = self
+            .min_ds_level
+            .trim()
+            .parse()
+            .map_err(|_| "Minimum Direct Strike level must be a whole number (0 = off).")?;
+        p.min_ds_matches = self
+            .min_ds_matches
+            .trim()
+            .parse()
+            .map_err(|_| "Minimum Direct Strike matches must be a whole number (0 = off).")?;
         p.auto_start = true;
         p.validate()?;
         Ok(p)
@@ -157,6 +179,10 @@ pub struct App {
     pub game: GameState,
     pub worker: Option<Worker>,
     pub lobby: Option<Snapshot>,
+    /// Direct Strike lookups for players in the current lobby (`None` = not on W3Champions).
+    pub ds_stats: std::collections::HashMap<String, Option<ghost_reforged::ds_report::DsStats>>,
+    /// The player a Ban click is waiting to confirm, with the reason typed so far.
+    pub ban_prompt: Option<(ghost_reforged::hosting::KickRequest, String)>,
     pub hosting_status: String,
     pub(super) closing: Option<iced::window::Id>,
     probing: bool,
@@ -200,6 +226,8 @@ impl App {
             game: GameState::Checking,
             worker: None,
             lobby: None,
+            ds_stats: Default::default(),
+            ban_prompt: None,
             hosting_status: "Idle".into(),
             closing: None,
             probing: false,
@@ -286,9 +314,17 @@ impl App {
         if self.worker.is_some()
             && matches!(
                 message,
-                Message::Edit(Field::Pattern | Field::Number, _)
+                Message::Edit(
+                    Field::Pattern
+                    | Field::Number
+                    | Field::DsPatch
+                    | Field::DsLevel
+                    | Field::DsMatches,
+                    _,
+                )
                     | Message::Private(_)
                     | Message::PlayerHost(_)
+                    | Message::ObserverSlots(_)
                     | Message::Speed(_)
                     | Message::MapName
                     | Message::Browse
@@ -342,6 +378,7 @@ impl App {
                 self.notify(result, "");
             }
             Message::Stop => {
+                self.ban_prompt = None;
                 self.hosting_requested = false;
                 self.updates.resume = false;
                 if let Some(worker) = &self.worker {
@@ -366,8 +403,24 @@ impl App {
                 }
             }
             Message::Ban(target) => {
-                if let Some(worker) = &self.worker {
-                    worker.send(Control::Ban(target));
+                let keep = self
+                    .ban_prompt
+                    .take()
+                    .filter(|(open, _)| *open == target)
+                    .map(|(_, reason)| reason);
+                self.ban_prompt = Some((target, keep.unwrap_or_default()));
+            }
+            Message::BanReason(value) => {
+                if let Some((_, reason)) = &mut self.ban_prompt {
+                    *reason = value.chars().take(ghost_reforged::bans::MAX_REASON).collect();
+                }
+            }
+            Message::CancelBan => self.ban_prompt = None,
+            Message::ConfirmBan => {
+                if let Some((target, reason)) = self.ban_prompt.take()
+                    && let Some(worker) = &self.worker
+                {
+                    worker.send(Control::Ban(target, reason.trim().to_owned()));
                 }
             }
             Message::PollHost => {
@@ -397,6 +450,9 @@ impl App {
                     Field::RehostDelay => self.form.rehost_delay = value,
                     Field::EmptyRefresh => self.form.empty_refresh = value,
                     Field::Welcome => self.form.profile.welcome.message = value,
+                    Field::DsPatch => self.form.profile.ds_patch_version = value,
+                    Field::DsLevel => self.form.min_ds_level = value,
+                    Field::DsMatches => self.form.min_ds_matches = value,
                 }
                 self.queue_settings();
             }
@@ -414,6 +470,9 @@ impl App {
             }
             Message::Private(value) => self.form.profile.private_game = value,
             Message::PlayerHost(value) => self.form.profile.player_host = value,
+            Message::ObserverSlots(value) => {
+                self.form.profile.observer_slots = value.min(ghost_reforged::config::MAX_OBSERVER_SLOTS);
+            }
             Message::Speed(value) => {
                 self.form.profile.speed = value;
                 self.motion.close_menus();

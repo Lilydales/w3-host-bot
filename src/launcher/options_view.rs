@@ -9,7 +9,7 @@ use super::{
 };
 use ghost_reforged::commands::ChatCommand;
 use iced::{
-    Element, Fill,
+    Alignment, Element, Fill,
     widget::{column, container, row, rule, scrollable, text, toggler},
 };
 
@@ -57,6 +57,11 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
                     .size(21)
                     .text_size(14)
                     .on_toggle(Message::PlayerHost),
+                if profile.player_host {
+                    observer_stepper(profile.observer_slots)
+                } else {
+                    column![].into()
+                },
                 toggler(profile.private_game)
                     .label("Private lobby")
                     .size(21)
@@ -104,6 +109,34 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
             )
         ]
         .spacing(12),
+        rule::horizontal(1),
+        text("Direct Strike filter").size(20),
+        muted(
+            "Players with a BattleTag are looked up on ds-report.com when they join. \
+             Players who are not found, or are below a minimum, are kicked (never banned). \
+             0 turns a minimum off. Applies when hosting starts."
+        ),
+        super::widgets::field_enabled(
+            "Patch version",
+            &profile.ds_patch_version,
+            Field::DsPatch,
+            app.worker.is_none()
+        ),
+        row![
+            super::widgets::field_enabled(
+                "Minimum level (0 = off)",
+                &app.form.min_ds_level,
+                Field::DsLevel,
+                app.worker.is_none()
+            ),
+            super::widgets::field_enabled(
+                "Minimum matches (0 = off)",
+                &app.form.min_ds_matches,
+                Field::DsMatches,
+                app.worker.is_none()
+            )
+        ]
+        .spacing(12),
     ]
     .spacing(16)
     .max_width(760);
@@ -134,4 +167,20 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
         .height(Fill)
         .style(p::panel),
     )
+}
+
+/// Observer slots left open in a player-host lobby; the map's other observer slots are closed.
+fn observer_stepper<'a>(count: u8) -> Element<'a, Message> {
+    let max = ghost_reforged::config::MAX_OBSERVER_SLOTS;
+    column![
+        row![
+            super::widgets::action("−", Message::ObserverSlots(count.saturating_sub(1)), count > 0),
+            text(count.to_string()).size(16).width(28).center(),
+            super::widgets::action("+", Message::ObserverSlots((count + 1).min(max)), count < max),
+            muted("Observer slots (0 = none)"),
+        ]
+        .spacing(9)
+        .align_y(Alignment::Center),
+    ]
+    .into()
 }

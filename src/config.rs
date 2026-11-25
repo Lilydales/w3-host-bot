@@ -4,6 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub const MAX_OBSERVER_SLOTS: u8 = 12;
+
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
     #[error("Cannot read configuration: {0}")]
@@ -28,6 +30,14 @@ pub struct Config {
     pub private_game: bool,
     pub lobby_password: String,
     pub host_mode: HostMode,
+    /// Observer slots left open in Player mode (0..=12); the rest are closed after creation.
+    pub observer_slots: u8,
+    /// Patch string sent to ds-report.com with every player lookup.
+    pub ds_patch_version: String,
+    /// Kick players below this Direct Strike level (0 = filter off).
+    pub min_ds_level: u32,
+    /// Kick players with fewer filtered matches than this (0 = filter off).
+    pub min_ds_matches: u32,
     pub game_speed: u8,
     pub min_players: u8,
     pub require_full: bool,
@@ -134,6 +144,10 @@ impl Default for Config {
             private_game: false,
             lobby_password: String::new(),
             host_mode: HostMode::Invisible,
+            observer_slots: 0,
+            ds_patch_version: crate::ds_report::DEFAULT_PATCH.into(),
+            min_ds_level: 0,
+            min_ds_matches: 0,
             game_speed: 2,
             min_players: 2,
             require_full: false,
@@ -172,12 +186,14 @@ impl Config {
                 *map = base.join(&*map);
             }
         }
+        config.observer_slots = config.observer_slots.min(MAX_OBSERVER_SLOTS);
         config.validate()?;
         Ok(config)
     }
 
     pub fn validate(&self) -> Result<(), ConfigError> {
         self.welcome.validate().map_err(ConfigError::Invalid)?;
+        crate::ds_report::validate_patch(&self.ds_patch_version).map_err(ConfigError::Invalid)?;
         let invalid = |s: &str| Err(ConfigError::Invalid(s.into()));
         if self.maps.is_empty() {
             return invalid("maps must contain at least one .w3x or .w3m file");
@@ -246,6 +262,11 @@ impl Config {
             return Err(ConfigError::InvisibleUnsupported);
         }
         Ok(())
+    }
+
+    /// The observer slot count, clamped to `0..=MAX_OBSERVER_SLOTS`.
+    pub fn observer_limit(&self) -> usize {
+        self.observer_slots.min(MAX_OBSERVER_SLOTS).into()
     }
 
     pub fn name(&self, number: u32) -> String {

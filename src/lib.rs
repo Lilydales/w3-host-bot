@@ -3,6 +3,7 @@ pub mod commands;
 pub mod config;
 pub mod diagnostics;
 pub mod discovery;
+pub mod ds_report;
 pub mod engine;
 pub mod hosting;
 pub mod protocol;

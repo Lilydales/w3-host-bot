@@ -124,6 +124,74 @@ impl SlotRequest {
     }
 }
 
+/// Player-mode hosts get every observer slot the map offers (up to 24 slots in all).
+/// This closes the extras after creation so only `observer_slots` stay in play.
+#[derive(Default)]
+pub(super) struct ObserverTrim {
+    lobby: String,
+    rounds: u8,
+    last: u64,
+    done: bool,
+}
+
+impl ObserverTrim {
+    const BATCH: usize = 8;
+    const MAX_ROUNDS: u8 = 12;
+
+    /// `roster` is true when the current event is a fresh `GameLobbySetup`;
+    /// `idle` is false while a manual slot edit or kick is in progress.
+    pub fn next(&mut self, engine: &Engine, now: u64, roster: bool, idle: bool) -> Vec<Command> {
+        if engine.config.host_mode != crate::config::HostMode::Player
+            || engine.phase != Phase::Lobby
+            || !roster
+            || !idle
+        {
+            return vec![];
+        }
+        let Some(lobby) = engine.owned_lobby(now) else {
+            return vec![];
+        };
+        if self.lobby != lobby.lobby_name {
+            *self = Self {
+                lobby: lobby.lobby_name.clone(),
+                ..Self::default()
+            };
+        }
+        if self.done || self.rounds >= Self::MAX_ROUNDS || (self.rounds > 0 && now <= self.last) {
+            return vec![];
+        }
+        let observers = || {
+            lobby
+                .players
+                .iter()
+                .filter(|p| !p.is_self && (p.is_observer || p.team == OBSERVER_TEAM))
+        };
+        let occupied = observers().filter(|p| p.slot_status == 2).count();
+        let mut open: Vec<u8> = observers()
+            .filter(|p| p.slot_status == 0 && p.slot_type_change_enabled)
+            .map(|p| p.slot)
+            .collect();
+        // Players already sitting in observer slots use up part of the allowance.
+        let keep = engine.config.observer_limit().saturating_sub(occupied);
+        if open.len() <= keep {
+            self.done = true;
+            return vec![];
+        }
+        open.sort_unstable();
+        let extra = open.split_off(keep);
+        self.rounds += 1;
+        self.last = now;
+        let mut commands: Vec<Command> = extra
+            .into_iter()
+            .rev()
+            .take(Self::BATCH)
+            .map(|slot| Command::new("CloseSlot", json!({"slot":slot})))
+            .collect();
+        commands.push(Command::empty("SendGameLobbySetup"));
+        commands
+    }
+}
+
 #[derive(Default)]
 pub(super) struct PendingSlot {
     request: Option<(SlotRequest, u64, RefreshGate)>,
@@ -131,6 +199,10 @@ pub(super) struct PendingSlot {
 }
 
 impl PendingSlot {
+    pub fn idle(&self) -> bool {
+        self.request.is_none()
+    }
+
     pub fn request(&mut self, request: SlotRequest, engine: &Engine, now: u64) {
         if self.request.is_none()
             && engine.phase == Phase::Lobby

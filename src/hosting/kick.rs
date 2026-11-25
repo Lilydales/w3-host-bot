@@ -64,6 +64,22 @@ impl KickRequest {
         })
     }
 
+    /// A kick for this named guest when they can be removed right now. Never the host.
+    pub(super) fn guest(lobby: &Lobby, name: &str) -> Option<Self> {
+        if !lobby.is_host {
+            return None;
+        }
+        lobby.players.iter().find_map(|p| {
+            let id = p.id.filter(|id| *id >= 0 && *id != 255)?;
+            (p.name == name && p.slot_status == 2 && p.slot_type == 0 && !p.is_self).then(|| Self {
+                lobby: lobby.lobby_name.clone(),
+                slot: p.slot,
+                id,
+                name: p.name.clone(),
+            })
+        })
+    }
+
     fn matches(&self, lobby: &Lobby) -> bool {
         lobby.is_host
             && lobby

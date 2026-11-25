@@ -19,6 +19,10 @@ impl App {
                 HostMode::Observer
             },
             count_host: p.player_host,
+            ds_patch_version: p.ds_patch_version,
+            min_ds_level: p.min_ds_level,
+            min_ds_matches: p.min_ds_matches,
+            observer_slots: p.observer_slots.min(ghost_reforged::config::MAX_OBSERVER_SLOTS),
             lobby_name: p.lobby_pattern,
             first_number: p.next_number,
             min_players: p.players,
@@ -102,6 +106,9 @@ impl App {
                 }
                 Event::Lobby(lobby) => self.lobby = Some(lobby),
                 Event::LobbyCleared => self.lobby = None,
+                Event::DsStats(name, stats) => {
+                    self.ds_stats.insert(name, stats);
+                }
                 Event::Reserve(number) => {
                     let result = self.reserve_number(number);
                     if let Some(worker) = &self.worker {
@@ -119,6 +126,7 @@ impl App {
                     self.preview.target(None);
                     self.worker = None;
                     self.lobby = None;
+                    self.ds_stats.clear();
                     self.hosting_status = if result.is_ok() {
                         "Stopped"
                     } else {
@@ -145,10 +153,19 @@ impl App {
 
     pub(super) fn record_activity(&mut self, event: Activity) {
         match event {
-            Activity::LobbyCreated(name) => self.log_line(&format!("Lobby created · {name}"), true),
-            Activity::GameStarted(name) => self.log_line(&format!("Game started · {name}"), true),
+            Activity::LobbyCreated(name) => {
+                self.ds_stats.clear();
+                self.log_line(&format!("Lobby created · {name}"), true)
+            }
+            Activity::GameStarted(name) => {
+                self.ds_stats.clear();
+                self.log_line(&format!("Game started · {name}"), true)
+            }
             Activity::Joined(name) => self.log(&format!("{name} joined")),
-            Activity::Left(name) => self.log(&format!("{name} left")),
+            Activity::Left(name) => {
+                self.ds_stats.remove(&name);
+                self.log(&format!("{name} left"))
+            }
             Activity::Command(line) => self.log(&line),
         }
     }

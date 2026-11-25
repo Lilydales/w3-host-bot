@@ -33,6 +33,21 @@ pub struct Profile {
     pub empty_rehost_seconds: u64,
     #[serde(default)]
     pub player_host: bool,
+    /// Observer slots kept open in player-host lobbies (0..=12).
+    #[serde(default)]
+    pub observer_slots: u8,
+    #[serde(default = "ds_patch")]
+    pub ds_patch_version: String,
+    /// 0 = filter off.
+    #[serde(default)]
+    pub min_ds_level: u32,
+    /// 0 = filter off.
+    #[serde(default)]
+    pub min_ds_matches: u32,
+}
+
+fn ds_patch() -> String {
+    ghost_reforged::ds_report::DEFAULT_PATCH.into()
 }
 
 fn rehost_delay() -> u64 {
@@ -94,6 +109,10 @@ impl Default for Profile {
             rehost_delay_seconds: rehost_delay(),
             empty_rehost_seconds: 0,
             player_host: false,
+            observer_slots: 0,
+            ds_patch_version: ds_patch(),
+            min_ds_level: 0,
+            min_ds_matches: 0,
         }
     }
 }
@@ -113,6 +132,7 @@ impl Profile {
 
     pub fn validate(&self) -> Result<(), String> {
         self.welcome.validate()?;
+        ghost_reforged::ds_report::validate_patch(&self.ds_patch_version)?;
         if self.title.trim().is_empty()
             || self.title.chars().count() > 60
             || self.title.chars().any(char::is_control)

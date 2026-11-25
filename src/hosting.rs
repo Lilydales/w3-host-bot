@@ -3,6 +3,7 @@ mod chat;
 mod control;
 use control::{Reservation, dispatch, reserve};
 mod connection;
+mod ds_check;
 mod controller;
 mod kick;
 mod repair;
@@ -45,7 +46,8 @@ pub enum Control {
     Settings(LiveSettings),
     Slot { slot: u8, open: bool },
     Kick(KickRequest),
-    Ban(KickRequest),
+    /// Ban and remove a player; the text is an optional reason (empty for none).
+    Ban(KickRequest, String),
     EditSlot(SlotRequest),
     Reserved { number: u32, saved: bool },
 }
@@ -89,6 +91,8 @@ pub enum Event {
     Status(String),
     Lobby(Snapshot),
     LobbyCleared,
+    /// Direct Strike lookup result for a player; `None` means not on W3Champions.
+    DsStats(String, Option<crate::ds_report::DsStats>),
     Reserve(u32),
     Finished(Result<(), String>),
 }
