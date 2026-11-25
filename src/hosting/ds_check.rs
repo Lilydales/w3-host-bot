@@ -198,13 +198,14 @@ impl DsCheck {
                 self.kicks.pop_front();
                 continue;
             }
-            return match KickRequest::guest(lobby, &name) {
-                Some(target) if manual.request(target, engine, now).is_some() => {
-                    self.kicks.pop_front();
-                    true
-                }
-                _ => false,
+            let Some(target) = KickRequest::guest(lobby, &name) else {
+                return false; // Not kickable yet; try again next tick.
             };
+            if manual.request(target, engine, now).is_some() {
+                self.kicks.pop_front();
+                return true;
+            }
+            return false;
         }
         false
     }
