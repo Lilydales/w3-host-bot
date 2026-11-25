@@ -31,3 +31,9 @@ For the people selling hosting solutions with closed source softwares: Welcome t
 ## Changes from upstream
 
 This fork of [shideneyu/ghost-reforged](https://github.com/shideneyu/ghost-reforged) (Apache 2.0) changes the chat command prefix from `?` to `!` and adds the persistent ban list (`src/bans.rs`, the **Ban** button, and automatic removal in `src/hosting/`).
+
+## Temporary diagnostics: W3 protocol logging
+
+Investigation only. Every text frame exchanged with Warcraft III's local UI WebSocket is printed to the console and appended to `w3-protocol.log` (current working directory; override with `W3_PROTOCOL_LOG_PATH`). RECV frames are logged before deserialization, SEND frames are the exact serialized frame. Keys containing password/token/cookie/secret/authorization/ticket are redacted. Native Warcraft III Ban support is **not** implemented.
+
+Disable: set `W3_PROTOCOL_LOG=0`. Remove: delete `src/protocol_log.rs`, the `pub mod protocol_log;` line in `src/lib.rs`, and the four `protocol_log::` calls in `src/transport.rs` (marked `TEMP`).
