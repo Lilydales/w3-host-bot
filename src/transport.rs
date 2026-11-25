@@ -49,26 +49,33 @@ impl Client {
     }
 
     pub fn send(&mut self, command: &str, payload: Value) -> Result<(), TransportError> {
+        let text = json!({"type": "webui", "message": command, "payload": payload}).to_string();
+        crate::protocol_log::log("SEND", &text); // TEMP protocol diagnostics
         self.0
-            .send(Message::Text(
-                json!({"type": "webui", "message": command, "payload": payload})
-                    .to_string()
-                    .into(),
-            ))
+            .send(Message::Text(text.into()))
             .map_err(|_| TransportError::Disconnected)
     }
 
     pub fn receive(&mut self) -> Result<Option<Value>, TransportError> {
         match self.0.read() {
-            Ok(Message::Text(text)) => Ok(Some(serde_json::from_str(&text)?)),
+            Ok(Message::Text(text)) => {
+                crate::protocol_log::log("RECV", &text); // TEMP: before deserialization
+                Ok(Some(serde_json::from_str(&text)?))
+            }
             Ok(Message::Ping(_)) => {
                 self.0.flush().map_err(|_| TransportError::Disconnected)?;
                 // A keepalive is not an idle input queue. Callers draining old
                 // callbacks must keep reading before requesting a fresh roster.
                 Ok(Some(Value::Null))
             }
-            Ok(Message::Close(_)) => Err(TransportError::Disconnected),
-            Ok(_) => Ok(Some(Value::Null)),
+            Ok(Message::Close(_)) => {
+                crate::protocol_log::log_note("RECV", "<WebSocket Close frame>");
+                Err(TransportError::Disconnected)
+            }
+            Ok(_) => {
+                crate::protocol_log::log_note("RECV", "<non-text WebSocket frame>");
+                Ok(Some(Value::Null))
+            }
             Err(tungstenite::Error::Io(e))
                 if matches!(
                     e.kind(),
