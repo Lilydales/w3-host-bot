@@ -1,0 +1,17 @@
+name: Update Cargo.lock
+
+# One-off helper: Actions tab > "Update Cargo.lock" > Run workflow.
+# Adds any missing dependency entries to Cargo.lock (existing versions stay pinned)
+# and commits the result, so the --locked Windows build can pass.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
