@@ -251,3 +251,75 @@ fn a_fresh_client_waits_for_initialization_not_just_provider_selection() {
     assert_eq!(engine.on_event(&initialized, 3)[0].message, "CreateLobby");
     assert!(engine.on_event(&initialized, 4).is_empty());
 }
+
+#[test]
+fn a_player_host_sees_the_results_then_returns_and_hosts_the_next_lobby() {
+    let mut engine = armed();
+    assert_eq!(engine.config.host_mode, HostMode::Player);
+    engine.config.rehost_delay_seconds = 15;
+    engine.on_event(&event("SetGlueScreen", json!({"screen":"LOADING_SCREEN"})), 5);
+    // `armed` never starts a game; force the confirmed in-game state.
+    engine.phase = Phase::InGame;
+    assert!(
+        engine
+            .on_event(&event("SetGlueScreen", json!({"screen":"SCORE_SCREEN"})), 100)
+            .is_empty(),
+        "the results stay open"
+    );
+    assert_eq!(engine.phase, Phase::Cooldown(115));
+    assert_eq!(engine.number(), 2);
+    assert!(engine.take_notice().unwrap().contains("next lobby in 15 s"));
+    assert!(engine.tick(114).is_empty());
+    let commands = engine.tick(115);
+    assert_eq!(
+        commands.iter().map(|c| c.message).collect::<Vec<_>>(),
+        ["ScoreScreenClose", "InitializeNetProvider"]
+    );
+    assert_eq!(engine.phase, Phase::AwaitMenu);
+    assert!(engine.tick(116).is_empty(), "closed once");
+    // Back on the custom games screen the next lobby is created.
+    let next = engine.on_event(
+        &event("OnNetProviderChanged", json!({"providerId":"BNET"})),
+        117,
+    );
+    let _ = next;
+    let created = engine.on_event(&event("GameList", json!({})), 118);
+    assert!(created.iter().any(|c| matches!(c.message, "CreateLobby" | "InitializeNetProvider")));
+}
+
+#[test]
+fn a_player_host_who_clicks_back_early_is_not_sent_a_stale_close() {
+    let mut engine = armed();
+    engine.phase = Phase::InGame;
+    engine.on_event(&event("SetGlueScreen", json!({"screen":"SCORE_SCREEN"})), 100);
+    engine.on_event(
+        &event("SetGlueScreen", json!({"screen":"MULTIPLAYER_CUSTOM_GAMES_SETUP"})),
+        102,
+    );
+    let until = match engine.phase {
+        Phase::Cooldown(until) => until,
+        ref other => panic!("expected cooldown, got {other:?}"),
+    };
+    assert!(
+        !engine
+            .tick(until)
+            .iter()
+            .any(|c| c.message == "ScoreScreenClose")
+    );
+}
+
+#[test]
+fn a_player_host_without_rehost_keeps_the_results_and_stops() {
+    let mut engine = armed();
+    engine.config.max_games = 1;
+    engine.phase = Phase::InGame;
+    assert!(
+        engine
+            .on_event(&event("SetGlueScreen", json!({"screen":"SCORE_SCREEN"})), 100)
+            .is_empty()
+    );
+    assert_eq!(
+        engine.phase,
+        Phase::Stopped("Configured game limit reached".into())
+    );
+}

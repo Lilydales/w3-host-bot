@@ -48,7 +48,11 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
         rule::horizontal(1),
         text("Hosting").size(20),
         toggler(profile.rehost)
-            .label("Create next lobby after countdown")
+            .label(if profile.player_host {
+                "Host the next lobby after each match"
+            } else {
+                "Create next lobby after countdown"
+            })
             .size(21)
             .text_size(14)
             .on_toggle(Message::Rehost),
@@ -100,7 +104,11 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
         },
         row![
             field(
-                "Rehost delay (s)",
+                if profile.player_host {
+                    "Results screen time (s)"
+                } else {
+                    "Rehost delay (s)"
+                },
                 &app.form.rehost_delay,
                 Field::RehostDelay
             ),
@@ -111,6 +119,12 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
             )
         ]
         .spacing(12),
+        muted(if profile.player_host {
+            "Play as host: when your match ends, the results stay open for this many seconds, \
+             then the bot closes them and hosts the next lobby. Click Back sooner to skip the wait."
+        } else {
+            "The bot leaves each started game and creates the next lobby after this delay."
+        }),
         rule::horizontal(1),
         text("Direct Strike filter").size(20),
         muted(

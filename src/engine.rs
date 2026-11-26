@@ -50,6 +50,9 @@ pub struct Engine {
     recovery_cancel: Option<u64>,
     retry_start_after: u64,
     notice: Option<String>,
+    /// Player mode: the match ended and the results screen is still open. It is closed
+    /// when the rehost delay ends, so the player can read the results first.
+    score_close_pending: bool,
 }
 
 impl Engine {
@@ -76,6 +79,7 @@ impl Engine {
             recovery_cancel: None,
             retry_start_after: 0,
             notice: None,
+            score_close_pending: false,
         }
     }
 
@@ -162,6 +166,8 @@ impl Engine {
             )
         {
             self.menu_required = false;
+            // The player left the results screen themselves; nothing to close later.
+            self.score_close_pending = false;
             if self.phase == Phase::WatchingGame {
                 self.phase = Phase::AwaitMenu;
             }
@@ -355,6 +361,21 @@ impl Engine {
                     }
                     self.phase = Phase::InGame;
                 }
+                Some("SCORE_SCREEN")
+                    if self.config.host_mode == HostMode::Player
+                        && self.phase == Phase::InGame =>
+                {
+                    // The host played this match. Count it, keep the results visible for
+                    // the rehost delay, then return to the menu and host the next lobby.
+                    self.finish_game(now);
+                    if matches!(self.phase, Phase::Cooldown(_)) {
+                        self.score_close_pending = true;
+                        self.notice = Some(format!(
+                            "Match finished · next lobby in {} s",
+                            self.config.rehost_delay_seconds
+                        ));
+                    }
+                }
                 Some("SCORE_SCREEN") if self.config.host_mode == HostMode::Player => {}
                 Some("SCORE_SCREEN") => {
                     self.finish_game(now);
@@ -475,7 +496,16 @@ impl Engine {
                 self.recover(now);
                 return vec![Command::empty("SendGameLobbySetup")];
             }
-            Phase::Cooldown(until) if now >= until => self.phase = Phase::AwaitMenu,
+            Phase::Cooldown(until) if now >= until => {
+                self.phase = Phase::AwaitMenu;
+                if std::mem::take(&mut self.score_close_pending) {
+                    // Same return path as the observer host after a match.
+                    return vec![
+                        Command::empty("ScoreScreenClose"),
+                        Command::empty("InitializeNetProvider"),
+                    ];
+                }
+            }
             _ => {}
         }
         if !matches!(

@@ -7,6 +7,23 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.8.0 — 2026-11-26
+
+### Added
+- **Rehost after a match in Play-as-host mode.** When the host's match ends (`SCORE_SCREEN`), the game is counted and the lobby number advances (`Engine::finish_game`). The results stay open for the rehost delay, then the bot sends `ScoreScreenClose` + `InitializeNetProvider` (the observer host's proven return path) and creates the next lobby. Before, player mode ignored the score screen and never rehosted.
+  - Clicking Back early skips the wait; no stale `ScoreScreenClose` is sent (`score_close_pending` is cleared on any menu screen).
+  - With "Host the next lobby after each match" off, the game still counts and hosting stops; the results screen is left alone.
+  - Activity shows "Match finished · next lobby in N s"; status shows the countdown.
+- Options: in Play-as-host mode the rehost toggle reads "Host the next lobby after each match" and the delay is labelled "Results screen time (s)", with a hint.
+- Tests: `a_player_host_sees_the_results_then_returns_and_hosts_the_next_lobby`, `a_player_host_who_clicks_back_early_is_not_sent_a_stale_close`, `a_player_host_without_rehost_keeps_the_results_and_stops`.
+
+### Changed
+- Version 0.7.0 → 0.8.0.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+- Not tested in game: that `ScoreScreenClose` closes the results for a player (it is used for the observer host today). If it does not, check `w3-protocol.log` around the match end.
+
 ## 0.7.0 — 2026-11-26
 
 ### Added
