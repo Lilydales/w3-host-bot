@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
+- PATCH (0.5.0 → 0.5.1): fixes, CI/docs-only tweaks.
+- MINOR (0.5.x → 0.6.0): new features or settings.
+- MAJOR: breaking changes (config/ban file formats). Stays 0 until a stable 1.0.
+Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
+`packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
+
+## 0.5.0 — 2026-11-26
 
 ### Added
 - **Ban list on the Options page** (`src/launcher/ban_list.rs`).
@@ -10,6 +17,8 @@
 - Test: `manual_and_last_game_bans_are_saved_with_reason_and_remembered`.
 
 ### Changed
+- Version 0.4.2 → 0.5.0 (new feature).
+- CI: moved GitHub Actions to Node 24 versions (`checkout@v6`, `cache@v5`, `upload-artifact@v6`) to clear the Node 20 deprecation warning.
 - Ban file location is resolved once at launcher start (`App::ban_file`) and shared with hosting.
 
 ### Not verified
