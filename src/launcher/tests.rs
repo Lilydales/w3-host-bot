@@ -346,3 +346,38 @@ fn upgrading_profiles_discards_the_old_host_name_and_keeps_the_map_and_counter()
     drop(store);
     assert_eq!(Store::open(dir.path()).unwrap().1, profiles);
 }
+
+#[test]
+fn manual_and_last_game_bans_are_saved_with_reason_and_remembered() {
+    use ghost_reforged::hosting::{Activity, Slot, Snapshot};
+    let directory = tempfile::tempdir().unwrap();
+    let mut app = App::new(directory.path(), None);
+    let path = directory.path().join("bans-under-test.json");
+    app.ban_file = path.clone();
+    let slot = |number, name: &str, own, computer| Slot {
+        id: Some(number as i64), name: name.into(), number, status: 2, computer,
+        observer: false, own, change_type: true, change_team: true,
+    };
+    let lobby = Snapshot {
+        name: "Test #3".into(), humans: 2, can_start: false, can_edit_slots: true,
+        slots: vec![slot(0, "Host#1", true, false), slot(1, "Rude#5", false, false),
+                    slot(2, "Computer", false, true), slot(3, "", false, false)],
+    };
+    assert_eq!(super::ban_list::guests(&lobby), vec!["Rude#5".to_string()]);
+    app.last_roster = ("Test #3".into(), super::ban_list::guests(&lobby));
+    app.record_activity(Activity::GameStarted("Test #3".into()));
+    assert_eq!(app.last_game.as_ref().unwrap().players, vec!["Rude#5".to_string()]);
+
+    let _ = app.update(Message::BanFormSubmit);
+    assert!(app.notice_error, "An empty BattleTag is rejected");
+    let _ = app.update(Message::BanFormTag("Typed#42".into()));
+    let _ = app.update(Message::BanFormReason("spam".into()));
+    let _ = app.update(Message::BanFormSubmit);
+    assert!(app.ban_form_tag.is_empty());
+    let _ = app.update(Message::BanLastPlayer("Rude#5".into()));
+    assert!(app.is_recently_banned("rude#5"));
+
+    let list = ghost_reforged::bans::BanList::open(Some(&path));
+    assert_eq!(list.get("typed#42").unwrap().reason, "spam");
+    assert!(list.is_banned("Rude#5"));
+}
