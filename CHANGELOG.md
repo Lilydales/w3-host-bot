@@ -7,6 +7,19 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.14.0 — 2026-11-26
+
+### Changed (Hosting page redesign, step 1)
+- **One player list.** The Lobby panel is now the only place players are listed: each occupied row shows `Lv 804 · 107` (coloured by the live DS filter: red below minimum / not on W3C, gold lookup failed, muted otherwise) between the name and the Slot/Kick/Ban controls. Your own row at the bottom shows your level too. The duplicate **Players** table on the left is gone.
+- **Left panel = control and feedback:** Host settings → Last game (after a match) → Recent kicks → **Recent activity** (last 10 Activity lines with an **Open log ▸** link), so the empty space now shows what the bot is doing.
+- Control positions unchanged (Slot/Kick/Ban stay right-aligned in the lobby row; Host/Force start/Stop stay in the footer), so existing UI click tests keep their coordinates.
+- `hosting_view::level_badge`, `recent_activity`; `players` kept but unused.
+- Version 0.13.1 → 0.14.0.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+- Not visually checked.
+
 ## 0.13.1 — 2026-11-26
 
 ### Fixed

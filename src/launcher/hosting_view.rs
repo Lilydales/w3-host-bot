@@ -151,9 +151,10 @@ pub fn view(app: &App) -> Element<'_, Message> {
     let inputs = column![
         settings,
         iced::widget::rule::horizontal(1),
-        players(app),
         current_game(app),
         recent_kicks(app),
+        iced::widget::rule::horizontal(1),
+        recent_activity(app),
     ]
     .spacing(12);
     let mut footer = column![
@@ -244,6 +245,9 @@ fn lobby(app: &App) -> Element<'_, Message> {
             let mut item = row![muted(format!("{:02}", slot.number + 1)).width(30), name]
             .spacing(8)
             .align_y(Alignment::Center);
+            if slot.status == 2 && !slot.computer && !slot.name.is_empty() {
+                item = item.push(level_badge(app, &slot.name));
+            }
             if slot.observer {
                 item = item.push(muted("Observer"));
             }
@@ -334,7 +338,12 @@ fn lobby(app: &App) -> Element<'_, Message> {
         row![
             art::ghost(30.0),
             text(observer_name).size(16).width(Fill),
-            muted(own_role)
+            row![
+                level_badge(app, observer_name),
+                muted(own_role)
+            ]
+            .spacing(10)
+            .align_y(Alignment::Center)
         ]
         .spacing(12)
         .align_y(Alignment::Center),
@@ -645,6 +654,7 @@ fn stats_table<'a>(
 }
 
 /// Everyone in the lobby with their Direct Strike level and filter verdict.
+#[allow(dead_code)]
 fn players(app: &App) -> Element<'_, Message> {
     let guests: Vec<String> = app
         .lobby
@@ -793,6 +803,67 @@ fn early_leavers<'a>(app: &App, game: &'a super::ban_list::LastGame, seconds: u6
     .padding(10)
     .style(p::panel)
     .into()
+}
+
+/// "Lv 804 · 107" for a player, coloured by the live DS filter. Empty while unknown.
+fn level_badge<'a>(app: &App, name: &str) -> Element<'a, Message> {
+    if name.trim().is_empty() {
+        return space().width(0).into();
+    }
+    let (min_level, min_matches) = filter_minimums(app);
+    let (level, matches, status, color) =
+        player_row(name, app.ds_stats.get(name).copied(), min_level, min_matches);
+    let label = match status {
+        "Checking…" if app.ds_failed.contains(name) => "Lookup failed".to_string(),
+        "Checking…" => "Lv …".to_string(),
+        "No BattleTag" => String::new(),
+        "Not on W3C" => "Not on W3C".to_string(),
+        _ => format!("Lv {level} · {matches}"),
+    };
+    let color = if app.ds_failed.contains(name) && status == "Checking…" {
+        p::GOLD
+    } else if status == "Found" {
+        p::MUTED
+    } else {
+        color
+    };
+    text(label).size(13).color(color).into()
+}
+
+/// The newest Activity lines, so status changes are visible without leaving the page.
+const ACTIVITY_LINES: usize = 10;
+
+fn recent_activity(app: &App) -> Element<'_, Message> {
+    let mut list = column![
+        row![
+            text("Recent activity").size(16).color(p::GOLD).width(Fill),
+            effects::hover(
+                button(text("Open log ▸").size(14).color(p::GOLD))
+                    .padding([0, 4])
+                    .style(p::inset)
+                    .on_press(Message::Page(super::app::Page::Activity)),
+                true,
+            )
+        ]
+        .align_y(Alignment::Center)
+    ]
+    .spacing(4);
+    if app.logs.is_empty() {
+        list = list.push(muted("Nothing yet."));
+    }
+    for entry in app.logs.iter().take(ACTIVITY_LINES) {
+        list = list.push(
+            row![
+                muted(&entry.time).width(48),
+                text(&entry.message)
+                    .size(13)
+                    .color(if entry.highlight { p::GOLD } else { p::TEXT })
+                    .width(Fill)
+            ]
+            .spacing(8),
+        );
+    }
+    list.into()
 }
 
 /// Recent kicks shown before "Show all".
