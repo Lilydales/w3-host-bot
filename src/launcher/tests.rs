@@ -470,3 +470,19 @@ fn settings_start_folded_only_when_a_real_map_is_ready() {
     let missing = App::new(directory.path().join("other").as_path(), Some("Nope.w3x".into()));
     assert!(missing.settings_open, "a missing map file needs attention");
 }
+
+#[test]
+fn the_hosts_own_stats_survive_a_new_lobby_and_the_game_start() {
+    use ghost_reforged::{ds_report::DsStats, hosting::Activity};
+    let directory = tempfile::tempdir().unwrap();
+    let mut app = App::new(directory.path(), None);
+    app.form.profile.player_host = true;
+    app.own_name = Some("Me#1".into());
+    app.ds_stats.insert("Me#1".into(), Some(DsStats { level: 40, matches: 900 }));
+    app.ds_stats.insert("Old#2".into(), None);
+    app.record_activity(Activity::LobbyCreated("DS #3".into()));
+    assert!(app.ds_stats.contains_key("Me#1") && !app.ds_stats.contains_key("Old#2"));
+    app.last_roster = ("DS #3".into(), vec!["Mate#4".into()]);
+    app.record_activity(Activity::GameStarted("DS #3".into()));
+    assert!(app.ds_stats.contains_key("Me#1"));
+}

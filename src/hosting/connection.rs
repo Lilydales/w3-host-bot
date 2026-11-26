@@ -203,6 +203,7 @@ fn open_once(
                 let value: Lobby = serde_json::from_value(event["payload"].clone())
                     .map_err(|_| "The native lobby format changed.")?;
                 if !crate::recovery::incomplete_lobby(&value)
+                    && config.finished_lobby.as_deref() != Some(value.lobby_name.as_str())
                     && (value.local().is_some() || value.is_host)
                     && crate::recovery::resumable_lobby(config, &value).is_none()
                 {

@@ -494,18 +494,30 @@ fn stats_table<'a>(
         header = header.push(space().width(78));
     }
     let mut table = column![header].spacing(6);
+    // The host comes first, so a working lookup is visible even with nobody else there.
+    let own = app.own_name.clone().filter(|_| app.form.profile.player_host);
+    let names: Vec<String> = own.iter().cloned().chain(names.filter(|n| Some(n) != own.as_ref())).collect();
     for name in names {
+        let you = own.as_ref() == Some(&name);
         let (level, matches, status, color) =
             player_row(&name, app.ds_stats.get(&name).copied(), min_level, min_matches);
+        let status = if you && status != "Checking…" && status != "No BattleTag" {
+            if status == "Not on W3C" { "You · not found" } else { "You" }
+        } else {
+            status
+        };
+        let shown = if you { format!("{name} (you)") } else { name.clone() };
         let mut line = row![
-            text(name.clone()).size(14).width(Fill),
+            text(shown).size(14).width(Fill),
             text(level).size(14).width(52),
             text(matches).size(14).width(66),
             text(status).size(14).color(color).width(112),
         ]
         .spacing(8)
         .align_y(Alignment::Center);
-        if ban {
+        if ban && you {
+            line = line.push(space().width(78));
+        } else if ban {
             let banned = app.is_recently_banned(&name);
             line = line.push(
                 container(action(
@@ -537,7 +549,7 @@ fn players(app: &App) -> Element<'_, Message> {
         })
         .collect();
     let mut section = column![text("Players").size(16).color(p::GOLD)].spacing(6);
-    if guests.is_empty() {
+    if guests.is_empty() && (app.own_name.is_none() || !app.form.profile.player_host || app.lobby.is_none()) {
         return section
             .push(muted(if app.in_game {
                 "The game is running; its players are in the Current Game panel."

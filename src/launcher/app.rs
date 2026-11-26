@@ -219,6 +219,8 @@ pub struct App {
     pub settings_open: bool,
     /// When the current match started, to tell an early end from a full game.
     pub(super) game_started_at: Option<Instant>,
+    /// The host's own BattleTag in player mode, shown first in the player lists.
+    pub own_name: Option<String>,
     pub hosting_status: String,
     pub(super) closing: Option<iced::window::Id>,
     probing: bool,
@@ -274,6 +276,7 @@ impl App {
             in_game: false,
             settings_open: true,
             game_started_at: None,
+            own_name: None,
             hosting_status: "Idle".into(),
             closing: None,
             probing: false,

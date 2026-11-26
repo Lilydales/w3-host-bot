@@ -115,6 +115,9 @@ impl App {
                 }
                 Event::Lobby(lobby) => {
                     self.last_roster = (lobby.name.clone(), super::ban_list::guests(&lobby));
+                    if let Some(me) = lobby.slots.iter().find(|s| s.own && !s.name.trim().is_empty()) {
+                        self.own_name = Some(me.name.clone());
+                    }
                     self.in_game = false;
                     self.lobby = Some(lobby);
                 }
@@ -205,14 +208,19 @@ impl App {
     pub(super) fn record_activity(&mut self, event: Activity) {
         match event {
             Activity::LobbyCreated(name) => {
-                self.ds_stats.clear();
+                // Keep the host's own stats; they are looked up again for the new lobby.
+                let own = self.own_name.clone();
+                self.ds_stats.retain(|player, _| own.as_deref() == Some(player.as_str()));
                 self.log_line(&format!("Lobby created · {name}"), true)
             }
             Activity::GameStarted(name) => {
                 self.in_game = true;
                 self.game_started_at = Some(Instant::now());
                 // Keep the levels of the players who are now in the game.
-                self.ds_stats.retain(|player, _| self.last_roster.1.contains(player));
+                let own = self.own_name.clone();
+                self.ds_stats.retain(|player, _| {
+                    self.last_roster.1.contains(player) || own.as_deref() == Some(player.as_str())
+                });
                 // Remember who played so they can be banned after the match.
                 if self.last_roster.0 == name && !self.last_roster.1.is_empty() {
                     self.last_game = Some(super::ban_list::LastGame {

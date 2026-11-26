@@ -260,6 +260,12 @@ impl Engine {
                     self.stop("Lobby schema changed; stopped before issuing further commands");
                     return Vec::new();
                 };
+                if !self.owned
+                    && self.config.finished_lobby.as_deref() == Some(lobby.lobby_name.as_str())
+                {
+                    // The finished match's roster, still reported after Quit. Not foreign.
+                    return self.tick(now);
+                }
                 let matches_name = lobby.lobby_name == self.config.name(self.number);
                 let map = protocol::client_path(&self.config.maps[self.map_index]);
                 let matches_map = protocol::same_map_path(&lobby.map_data.map_path, &map);
@@ -414,6 +420,7 @@ impl Engine {
     /// close them and host the next lobby (see the `Cooldown` arm of `tick`).
     fn player_match_over(&mut self, now: u64) {
         self.match_ended = true;
+        self.config.finished_lobby = Some(self.config.name(self.number));
         self.finish_game(now);
         if matches!(self.phase, Phase::Cooldown(_)) {
             self.score_close_pending = true;

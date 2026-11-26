@@ -7,6 +7,24 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.11.0 — 2026-11-26
+
+### Added
+- **Your own stats.** In Play-as-host mode the host's BattleTag is looked up on ds-report once per lobby (`DsCheck::lookup_self`) and shown first in Players and Current Game as "Name (you)". Display only: never filtered, kicked or announced. Activity logs `DS lookup for you · … · <result>` ("not found (HTTP 404/500)" or "lookup failed"), so a broken lookup is obvious.
+- `App::own_name`; own stats are kept across new lobbies and game start.
+- Tests: `the_hosts_own_lookup_is_shown_but_never_kicked_or_announced`, `the_hosts_own_stats_survive_a_new_lobby_and_the_game_start`, `the_finished_matchs_roster_after_quit_does_not_stop_a_player_host`.
+
+### Fixed
+- **Hosting stopped after clicking Quit (likely cause).** After a player-host match the bot releases the lobby, but Warcraft III can still report the finished game's roster. The engine treated it as "an existing lobby is active" and stopped; on reconnect the same roster raised "This lobby belongs to another session", so hosting never resumed. The finished lobby's name is now remembered (`Config::finished_lobby`, not saved) and its roster is ignored by both checks. Any other foreign lobby still stops hosting.
+
+### Changed
+- Version 0.10.0 → 0.11.0.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+- The Quit fix matches the symptoms but was not confirmed against a log. If hosting still stops, the last Activity lines show why.
+- Direct Strike's in-game VICTORY panel waits for Quit; the bot cannot press it.
+
 ## 0.10.0 — 2026-11-26
 
 ### Added

@@ -218,6 +218,14 @@ pub(super) fn run(
                 // Settings were applied by `dispatch` above; re-check the current lobby.
                 ds.refilter(&engine.config, now, tx);
             }
+            if engine.config.host_mode == crate::config::HostMode::Player
+                && let Some(me) = engine
+                    .owned_lobby(now)
+                    .and_then(|lobby| lobby.local())
+                    .map(|p| p.name.clone())
+            {
+                ds.lookup_self(&engine.config, &me);
+            }
             ds.poll(&engine.config, now, tx, &mut announcements);
             if identity_ok {
                 ds.kick(&engine, &mut manual_kick, now);

@@ -364,3 +364,20 @@ fn the_end_of_a_player_match_is_reported_once() {
     engine.on_event(&event("SetGlueScreen", json!({"screen":"SCORE_SCREEN"})), 11);
     assert!(!engine.take_match_ended(), "the late results screen is not a second match");
 }
+
+#[test]
+fn the_finished_matchs_roster_after_quit_does_not_stop_a_player_host() {
+    let mut engine = armed();
+    engine.phase = Phase::InGame;
+    engine.on_event(&event("GameClosed", json!({})), 10);
+    assert!(matches!(engine.phase, Phase::Cooldown(_)));
+    // Warcraft III reports the old lobby again after Quit; it must not look foreign.
+    engine.on_event(&lobby(vec![player(0, true, false, false)]), 11);
+    assert!(matches!(engine.phase, Phase::Cooldown(_)), "{:?}", engine.phase);
+    assert_eq!(engine.config.finished_lobby.as_deref(), Some("GHost Rust #1"));
+    // A genuinely different lobby still stops hosting.
+    let mut other = lobby(vec![player(0, true, false, false)]);
+    other["payload"]["lobbyName"] = json!("Someone else #9");
+    engine.on_event(&other, 12);
+    assert!(matches!(engine.phase, Phase::Stopped(_)));
+}

@@ -36,6 +36,8 @@ pub(super) struct DsCheck {
     last_sent: Option<u64>,
     /// Answers for players still in the lobby, so a live filter change can re-check them.
     verdicts: std::collections::BTreeMap<String, Lookup>,
+    /// The host's own BattleTag, looked up for display only (never filtered or kicked).
+    own: Option<String>,
 }
 
 impl Default for DsCheck {
@@ -51,6 +53,7 @@ impl Default for DsCheck {
             reasons: Default::default(),
             last_sent: None,
             verdicts: Default::default(),
+            own: None,
         }
     }
 }
@@ -111,6 +114,29 @@ impl DsCheck {
         true
     }
 
+    /// Looks up the host's own stats once per lobby, so the launcher can show them and the
+    /// host can see the lookup works. The answer is never used to kick or announce.
+    pub fn lookup_self(&mut self, config: &Config, name: &str) {
+        if !name.contains('#') || self.own.as_deref() == Some(name) {
+            return;
+        }
+        let (sender, tag, patch) = (
+            self.sender.clone(),
+            name.to_owned(),
+            config.ds_patch_version.clone(),
+        );
+        if thread::Builder::new()
+            .name("ghost-ds-lookup".into())
+            .spawn(move || {
+                let result = ds_report::lookup(&tag, &patch);
+                let _ = sender.send((tag, result));
+            })
+            .is_ok()
+        {
+            self.own = Some(name.to_owned());
+        }
+    }
+
     pub fn left(&mut self, name: &str) {
         self.pending.remove(name);
         self.seen.remove(name);
@@ -129,6 +155,7 @@ impl DsCheck {
         self.reasons.clear();
         self.last_sent = None;
         self.verdicts.clear();
+        self.own = None;
         while self.results.try_recv().is_ok() {}
     }
 
@@ -141,6 +168,21 @@ impl DsCheck {
         announcements: &mut Announcements,
     ) {
         while let Ok((name, result)) = self.results.try_recv() {
+            if self.own.as_deref() == Some(name.as_str()) && !self.pending.contains(&name) {
+                // Display only: the host is never filtered, kicked or announced.
+                let detail = match result {
+                    Lookup::Found(s) => format!("Lv. {} ({} matches)", s.level, s.matches),
+                    Lookup::NotFound => "not found (HTTP 404/500)".into(),
+                    Lookup::Failed => "lookup failed (network or unreadable answer)".into(),
+                };
+                let _ = events.send(Event::Activity(Activity::Command(format!(
+                    "DS lookup for you · {name} · {detail}"
+                ))));
+                if result != Lookup::Failed {
+                    let _ = events.send(Event::DsStats(name, result.stats()));
+                }
+                continue;
+            }
             if !self.pending.remove(&name) {
                 continue; // The player left, or the lobby changed, while it ran.
             }
@@ -378,5 +420,18 @@ mod tests {
         check.refilter(&Config::default(), 7, &events);
         assert!(check.kicks.is_empty() && check.reasons.is_empty());
         assert!(received.try_iter().count() >= 1);
+    }
+
+    #[test]
+    fn the_hosts_own_lookup_is_shown_but_never_kicked_or_announced() {
+        let mut check = DsCheck::default();
+        let (events, received) = mpsc::channel();
+        check.own = Some("Me#1".into());
+        check.sender.send(("Me#1".into(), Lookup::NotFound)).unwrap();
+        let strict = Config { min_ds_level: 50, ..Config::default() };
+        check.poll(&strict, 1, &events, &mut Announcements::default());
+        assert!(check.kicks.is_empty() && check.messages.is_empty());
+        let all: Vec<_> = received.try_iter().collect();
+        assert!(all.iter().any(|e| matches!(e, Event::DsStats(n, None) if n == "Me#1")));
     }
 }

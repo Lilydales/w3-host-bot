@@ -59,6 +59,10 @@ pub struct Config {
     pub load_timeout_seconds: u64,
     pub max_games: u32,
     pub map_settings: MapSettings,
+    /// Player mode: the lobby of the match that just ended. Warcraft III can keep
+    /// reporting its roster after Quit; it is ignored instead of treated as foreign.
+    #[serde(skip)]
+    pub finished_lobby: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
@@ -169,6 +173,7 @@ impl Default for Config {
             load_timeout_seconds: 180,
             max_games: 0,
             map_settings: MapSettings::default(),
+            finished_lobby: None,
         }
     }
 }
