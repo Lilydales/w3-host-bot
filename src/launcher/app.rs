@@ -548,7 +548,7 @@ impl App {
                 self.apply_settings();
             }
             Message::Rehost(value) => {
-                self.form.profile.rehost = value;
+                self.form.profile.set_rehost(value);
                 self.apply_settings();
             }
             Message::Private(value) => self.form.profile.private_game = value,

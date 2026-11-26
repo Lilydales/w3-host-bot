@@ -119,8 +119,10 @@ impl Engine {
     }
 
     pub fn update_rehost(&mut self, enabled: bool, delay: u64, now: u64) {
-        self.config.leave_on_load = enabled;
-        self.config.restart_on_load = enabled;
+        // Leaving at load and restarting the client only apply to the observer host.
+        let observer = self.config.host_mode == HostMode::Observer;
+        self.config.leave_on_load = enabled && observer;
+        self.config.restart_on_load = enabled && observer;
         self.config.max_games = if enabled {
             0
         } else {

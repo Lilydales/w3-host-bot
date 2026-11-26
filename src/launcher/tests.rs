@@ -486,3 +486,22 @@ fn the_hosts_own_stats_survive_a_new_lobby_and_the_game_start() {
     app.record_activity(Activity::GameStarted("DS #3".into()));
     assert!(app.ds_stats.contains_key("Me#1"));
 }
+
+#[test]
+fn player_and_observer_hosts_keep_separate_rehost_switches() {
+    let mut profile = super::profile::Profile::default();
+    assert!(profile.player_rehost, "player rehost is on by default");
+    profile.rehost = false; // An observer profile that turned rehost off.
+    profile.player_host = true;
+    assert!(profile.rehosts(), "switching to Play as host does not inherit it");
+    profile.set_rehost(false);
+    assert!(!profile.player_rehost && !profile.rehosts());
+    profile.player_host = false;
+    profile.set_rehost(true);
+    assert!(profile.rehost && !profile.player_rehost);
+    // Profiles saved before 0.12.2 load with player rehost on.
+    let mut saved = serde_json::to_value(&profile).unwrap();
+    saved.as_object_mut().unwrap().remove("player_rehost");
+    let loaded: super::profile::Profile = serde_json::from_value(saved).unwrap();
+    assert!(loaded.player_rehost);
+}

@@ -47,7 +47,7 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
         commands,
         rule::horizontal(1),
         text("Hosting").size(20),
-        toggler(profile.rehost)
+        toggler(profile.rehosts())
             .label(if profile.player_host {
                 "Host the next lobby after each match"
             } else {

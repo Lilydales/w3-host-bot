@@ -52,6 +52,11 @@ pub struct Profile {
     /// Last resort when Quit cannot be pressed: leave the game (may count as a leave).
     #[serde(default)]
     pub leave_if_quit_fails: bool,
+    /// Play as host: host the next lobby after each of your matches. Separate from
+    /// `rehost`, which is the observer bot's "create next lobby after countdown", so
+    /// switching modes never inherits the other mode's choice. On by default.
+    #[serde(default = "private_by_default")]
+    pub player_rehost: bool,
 }
 
 fn auto_quit_delay() -> u64 {
@@ -128,16 +133,34 @@ impl Default for Profile {
             auto_quit: true,
             auto_quit_delay_seconds: auto_quit_delay(),
             leave_if_quit_fails: false,
+            player_rehost: true,
         }
     }
 }
 
 impl Profile {
+    /// Whether the next lobby is hosted automatically, for the mode in use.
+    pub fn rehosts(&self) -> bool {
+        if self.player_host {
+            self.player_rehost
+        } else {
+            self.rehost
+        }
+    }
+
+    pub fn set_rehost(&mut self, value: bool) {
+        if self.player_host {
+            self.player_rehost = value;
+        } else {
+            self.rehost = value;
+        }
+    }
+
     pub fn live_settings(&self) -> ghost_reforged::hosting::LiveSettings {
         ghost_reforged::hosting::LiveSettings {
             minimum: self.players,
             full: self.require_full,
-            rehost: self.rehost,
+            rehost: self.rehosts(),
             rehost_delay: self.rehost_delay_seconds,
             empty_refresh: self.empty_rehost_seconds,
             commands: self.commands.clone(),

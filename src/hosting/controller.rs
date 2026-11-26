@@ -393,6 +393,7 @@ pub(super) fn run(
                 let _ = tx.send(Event::LobbyCleared);
                 if let Phase::Stopped(reason) = &engine.phase {
                     return if reason == "Configured game limit reached" {
+                        limit_reached(&engine, tx);
                         Ok(Step::Stop)
                     } else {
                         Err(reason.clone())
@@ -466,6 +467,7 @@ pub(super) fn run(
             }
             if let Phase::Stopped(reason) = &engine.phase {
                 if reason == "Configured game limit reached" {
+                    limit_reached(&engine, tx);
                     return Ok(Step::Stop);
                 }
                 return Err(reason.clone());
@@ -565,4 +567,17 @@ pub(super) fn run(
             resources.game.as_ref().map(|game| game.pid()),
         ));
     }
+}
+
+/// Hosting ends cleanly after a match only because rehosting is off. Say so plainly,
+/// since from the game it just looks like the bot stopped.
+fn limit_reached(engine: &Engine, tx: &Sender<Event>) {
+    let line = if engine.config.max_games <= 1 {
+        "Hosting stopped after the match because \"Host the next lobby after each match\" \
+         is off (Options → Hosting). Turn it on to keep hosting."
+    } else {
+        "Hosting stopped: the configured number of games was reached."
+    };
+    status(tx, line);
+    let _ = tx.send(Event::Activity(Activity::Command(line.into())));
 }

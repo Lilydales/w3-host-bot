@@ -7,6 +7,33 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.12.2 — 2026-11-26
+
+### Fixed
+- **Play-as-host stopped after one match because it shared the observer bot's rehost switch.** The profile's `rehost` ("Create next lobby after countdown") was designed for the observer host; when it was off, a player host also stopped after its first match. Play-as-host now has its own switch, `player_rehost` ("Host the next lobby after each match"), **on by default**, including for existing profiles (serde default true). `Profile::rehosts()` / `set_rehost()` pick the switch for the mode in use; the Options toggle, live settings, `max_games` and the Hosting summary all use it. Turning Play-as-host on or off never inherits the other mode's choice.
+- Test: `player_and_observer_hosts_keep_separate_rehost_switches`.
+
+### Changed
+- Version 0.12.1 → 0.12.2.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+
+## 0.12.1 — 2026-11-26
+
+### Fixed
+- **Unexplained stop after a match.** The only path in the code that ends hosting cleanly after a match (no error, no Stop click) is the game limit, which applies when "Host the next lobby after each match" is off (`max_games` = 1). The bot now says so in the status line, Activity and the notice, instead of just "Auto Host stopped.". Other failures already retry automatically and never stop hosting.
+- The collapsed host settings line shows `Rehost: on` or `Rehost: OFF (stops after 1 game)`.
+- Live settings no longer switch on the observer-only "leave at load" / "restart client" flags for a player host (`Engine::update_rehost`). They were ignored in player mode, so this is a tidy-up, not the cause.
+- Tests: `live_rehost_settings_never_turn_on_observer_only_leaving_for_a_player_host`; summary test covers the rehost text.
+
+### Changed
+- Version 0.12.0 → 0.12.1.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+- Not confirmed that rehost is off in the user's profile; the new message will show it.
+
 ## 0.12.0 — 2026-11-26
 
 ### Added

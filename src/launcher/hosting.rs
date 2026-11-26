@@ -23,6 +23,7 @@ impl App {
     pub(super) fn start_hosting(&mut self) -> Result<(), String> {
         self.save()?;
         let p = self.form.read()?;
+        let rehost = p.rehosts(); // before fields are moved out of `p`
         let map = p.map.ok_or("Select a Warcraft III map first.")?;
         let map = super::maps::validate(&map)?;
         let config = Config {
@@ -54,8 +55,9 @@ impl App {
             countdown_seconds: 0,
             leave_on_load: p.rehost && !p.player_host,
             restart_on_load: p.rehost && !p.player_host,
+            // Player and observer hosts keep separate rehost choices (`Profile::rehosts`).
             private_game: p.private_game,
-            max_games: if p.rehost { 0 } else { 1 },
+            max_games: if rehost { 0 } else { 1 },
             map_settings: map_settings(p.player_host, p.observer_slots),
             auto_quit: p.player_host && p.auto_quit,
             auto_quit_delay_seconds: p.auto_quit_delay_seconds,
@@ -155,16 +157,23 @@ impl App {
                     self.game_started_at = None;
                     self.settings_open = !self.settings_complete();
                     self.ds_stats.clear();
-                    self.hosting_status = if result.is_ok() {
-                        "Stopped"
+                    let explained = self.hosting_status.starts_with("Hosting stopped");
+                    self.hosting_status = if explained {
+                        std::mem::take(&mut self.hosting_status)
+                    } else if result.is_ok() {
+                        "Stopped".to_string()
                     } else {
-                        "Stopped with an error"
-                    }
-                    .into();
+                        "Stopped with an error".to_string()
+                    };
                     if let Err(error) = &result {
                         self.log(error);
                     }
-                    self.notify(result, "Auto Host stopped.");
+                    let done = if explained {
+                        self.hosting_status.clone()
+                    } else {
+                        "Auto Host stopped.".to_string()
+                    };
+                    self.notify(result, &done);
                     break;
                 }
             }

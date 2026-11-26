@@ -381,3 +381,15 @@ fn the_finished_matchs_roster_after_quit_does_not_stop_a_player_host() {
     engine.on_event(&other, 12);
     assert!(matches!(engine.phase, Phase::Stopped(_)));
 }
+
+#[test]
+fn live_rehost_settings_never_turn_on_observer_only_leaving_for_a_player_host() {
+    let mut engine = armed();
+    assert_eq!(engine.config.host_mode, HostMode::Player);
+    engine.update_rehost(true, 15, 1);
+    assert!(!engine.config.leave_on_load && !engine.config.restart_on_load);
+    assert_eq!(engine.config.max_games, 0, "rehost on never stops");
+    engine.config.host_mode = HostMode::Observer;
+    engine.update_rehost(true, 15, 2);
+    assert!(engine.config.leave_on_load && engine.config.restart_on_load);
+}

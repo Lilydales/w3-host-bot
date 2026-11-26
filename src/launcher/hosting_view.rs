@@ -398,8 +398,13 @@ pub(super) fn settings_summary(app: &App) -> String {
         (0, matches) => format!("Min {matches} matches"),
         (level, matches) => format!("Min level {level} · {matches} matches"),
     };
+    let after = if app.form.profile.rehosts() {
+        "Rehost: on"
+    } else {
+        "Rehost: OFF (stops after 1 game)"
+    };
     format!(
-        "{} · {start} · {filter}",
+        "{} · {start} · {filter} · {after}",
         app.form.profile.lobby_name(number)
     )
 }
@@ -733,15 +738,21 @@ mod tests {
         app.form.profile.lobby_pattern = "Mix Mode DS #{n}".into();
         app.form.number = "5".into();
         app.form.profile.require_full = true;
-        assert_eq!(settings_summary(&app), "Mix Mode DS #5 · Auto start: Full · Filter off");
+        app.form.profile.rehost = true;
+        assert_eq!(
+            settings_summary(&app),
+            "Mix Mode DS #5 · Auto start: Full · Filter off · Rehost: on"
+        );
         app.form.profile.require_full = false;
         app.form.players = "6".into();
         app.form.min_ds_level = "10".into();
         app.form.min_ds_matches = "100".into();
         assert_eq!(
             settings_summary(&app),
-            "Mix Mode DS #5 · Auto start: 6 players · Min level 10 · 100 matches"
+            "Mix Mode DS #5 · Auto start: 6 players · Min level 10 · 100 matches · Rehost: on"
         );
+        app.form.profile.set_rehost(false);
+        assert!(settings_summary(&app).ends_with("Rehost: OFF (stops after 1 game)"));
     }
 
     #[test]
