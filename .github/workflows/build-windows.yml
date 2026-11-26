@@ -1,9 +1,13 @@
 name: Build Windows exe
 
-on:
-  workflow_dispatch:        # adds a "Run workflow" button in the Actions tab
+'on':
+  workflow_dispatch:
   push:
-    tags: ['v*']            # also builds when a tag like v0.2.5 is pushed
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - Cargo.toml
+      - .github/workflows/build-windows.yml
 
 permissions:
   contents: write
@@ -14,12 +18,55 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate release version
+        id: version
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import tomllib
+          from pathlib import Path
+
+          def version(path):
+              with Path(path).open('rb') as file:
+                  return tomllib.load(file)['package']['version']
+
+          version_app = version('Cargo.toml')
+          version_setup = version('packaging/windows/setup/Cargo.toml')
+          if not re.fullmatch(r'(?:0|[1-9][0-9]*)(?:\.(?:0|[1-9][0-9]*)){2}', version_app):
+              raise SystemExit(f'Expected a stable MAJOR.MINOR.PATCH version; got {version_app!r}.')
+          if version_app != version_setup:
+              raise SystemExit(f'App version {version_app} and installer version {version_setup} do not match.')
+          tag = f'v{version_app}'
+          ref = os.environ['GITHUB_REF']
+          if ref.startswith('refs/tags/') and ref != f'refs/tags/{tag}':
+              raise SystemExit(f'Tag {ref} does not match the package version ({tag}).')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              print(f'version={version_app}', f'tag={tag}', sep='\n', file=output)
+          PY
+
+      - name: Check whether this version is already tagged
+        id: auto
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          existing=$(git ls-remote --refs origin "refs/tags/$RELEASE_TAG")
+          if [[ -n "$existing" ]]; then
+            echo "$RELEASE_TAG already exists; no automatic build or release."
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install Rust (MSVC)
+        if: steps.auto.outputs.skip != 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
 
       - name: Cache cargo
+        if: steps.auto.outputs.skip != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -28,18 +75,50 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Test bot
+        if: steps.auto.outputs.skip != 'true'
+        run: cargo test --locked --target x86_64-pc-windows-msvc
+
       - name: Build exe and installer
+        if: steps.auto.outputs.skip != 'true'
         shell: pwsh
         run: ./packaging/windows/build.ps1 -Setup
 
       - name: Upload build output
+        if: steps.auto.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: w3-host-bot-windows
-          path: target/release-assets/*/*
+          path: target/release-assets/${{ steps.version.outputs.version }}/*
+          if-no-files-found: error
 
-      - name: Attach to GitHub Release (tag builds only)
+      - name: Tag the built commit and publish the Windows release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.auto.outputs.skip != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          release_dir="target/release-assets/$RELEASE_VERSION"
+          for file in ghost-reforged.exe GHost-Reforged-Setup-x64.exe SHA256SUMS; do
+            test -s "$release_dir/$file"
+          done
+          # Never move an existing tag. Recheck after the build in case one arrived.
+          tag_ref="refs/tags/$RELEASE_TAG"
+          existing=$(git ls-remote --refs origin "$tag_ref")
+          if [[ -n "$existing" ]]; then
+            echo "$RELEASE_TAG already exists; leaving it untouched."
+            exit 0
+          fi
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git push origin "$GITHUB_SHA:$tag_ref"
+          gh release create "$RELEASE_TAG" "$release_dir/"* --verify-tag --title "$RELEASE_TAG" --generate-notes
+
+      - name: Attach to GitHub Release (manual tag builds)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: target/release-assets/*/*
+          files: target/release-assets/${{ steps.version.outputs.version }}/*
+          fail_on_unmatched_files: true
