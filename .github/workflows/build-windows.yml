@@ -77,9 +77,12 @@ jobs:
 
       - name: Test bot
         if: steps.auto.outputs.skip != 'true'
-        # The hosted runner lacks the active audio endpoint this proof requires.
-        # Keep the window tests and every other test as release gates.
-        run: cargo test --locked --target x86_64-pc-windows-msvc -- --skip background_audio::tests::native_mute_covers_new_sessions_and_restores_without_muting_other_processes
+        # These two integration tests require an active Windows playback endpoint.
+        # Keep all other tests, including window and launcher tests, as release gates.
+        run: >-
+          cargo test --locked --target x86_64-pc-windows-msvc --
+          --skip background_audio::tests::native_mute_covers_new_sessions_and_restores_without_muting_other_processes
+          --skip audio_tests::idle_launcher_mutes_until_quit_including_close_to_tray_and_stop_hosting
 
       - name: Build exe and installer
         if: steps.auto.outputs.skip != 'true'
