@@ -63,6 +63,12 @@ pub struct Config {
     /// reporting its roster after Quit; it is ignored instead of treated as foreign.
     #[serde(skip)]
     pub finished_lobby: Option<String>,
+    /// Player mode: press the map's Quit button when its end panel appears.
+    pub auto_quit: bool,
+    /// Seconds the end panel stays up before Quit is pressed.
+    pub auto_quit_delay_seconds: u64,
+    /// If Quit cannot be pressed, leave the game instead (may be recorded as a leave).
+    pub leave_if_quit_fails: bool,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
@@ -174,6 +180,9 @@ impl Default for Config {
             max_games: 0,
             map_settings: MapSettings::default(),
             finished_lobby: None,
+            auto_quit: false,
+            auto_quit_delay_seconds: 5,
+            leave_if_quit_fails: false,
         }
     }
 }

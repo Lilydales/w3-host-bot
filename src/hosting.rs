@@ -4,6 +4,7 @@ mod control;
 use control::{Reservation, dispatch, reserve};
 mod connection;
 mod ds_check;
+mod end_watch;
 mod controller;
 mod kick;
 mod repair;

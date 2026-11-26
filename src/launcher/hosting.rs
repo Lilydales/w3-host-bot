@@ -57,6 +57,9 @@ impl App {
             private_game: p.private_game,
             max_games: if p.rehost { 0 } else { 1 },
             map_settings: map_settings(p.player_host, p.observer_slots),
+            auto_quit: p.player_host && p.auto_quit,
+            auto_quit_delay_seconds: p.auto_quit_delay_seconds,
+            leave_if_quit_fails: p.leave_if_quit_fails,
             ..Config::default()
         };
         self.worker = Some(Worker::start(config)?);

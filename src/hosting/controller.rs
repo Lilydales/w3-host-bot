@@ -70,6 +70,7 @@ pub(super) fn run(
     let mut slot_edit = slots::PendingSlot::default();
     let mut observer_trim = slots::ObserverTrim::default();
     let mut ds = super::ds_check::DsCheck::default();
+    let mut end_watch = super::end_watch::EndWatch::default();
     loop {
         let step = supervision::attempt(|| -> Result<Step, String> {
             let game = resources
@@ -230,6 +231,7 @@ pub(super) fn run(
             if identity_ok {
                 ds.kick(&engine, &mut manual_kick, now);
             }
+            commands.extend(end_watch.step(&engine, game.pid(), now, tx));
             if let Some(Control::EditSlot(request)) = &control {
                 slot_edit.request(request.clone(), &engine, now);
             }
@@ -532,6 +534,7 @@ pub(super) fn run(
         slot_edit = Default::default();
         observer_trim = Default::default();
         ds.reset();
+        end_watch = Default::default();
         chat.reset();
         deferred_controls
             .retain(|control| matches!(control, Control::Settings(_) | Control::StartRule { .. }));

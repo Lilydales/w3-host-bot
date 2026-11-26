@@ -7,6 +7,26 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.12.0 — 2026-11-26
+
+### Added
+- **Auto-quit for Direct Strike (Play-as-host).** The map's VICTORY/DEFEAT panel sends nothing to the bot, so the bot watches the game window instead (`src/end_panel.rs`, `src/hosting/end_watch.rs`).
+  - Detection: every 2 s while a match runs, a window capture is compared with two reference patches (the panel's Quit button and its discord link box) using normalised cross-correlation, searched ±3 px. Both must score ≥ 0.75, on two captures in a row. Positions come from war3map.j (Quit button 0.08×0.04 at (0.675, 0.21) on the 0.8×0.6 frame grid, 4:3-centred), so any window size works. The Extra Round button (0.56, 0.21) is never clicked.
+  - Action, after the configured delay: a posted click on Quit (mouse untouched); 4 s later, if the panel is still there, a real click (game brought forward, pointer moved and put back); 15 s later, only if enabled, `LeaveGame` as a last resort.
+  - Clicking Quit runs the map's own win/loss code, so W3C/FLO results are recorded normally. The results screen then follows and the existing rehost path takes over.
+  - Activity logs "End panel seen · match 0.92 / 0.95", each click, and capture failures.
+- Options (Play as host): "Press Quit on the Direct Strike end panel" (on by default), a 0–60 s delay (default 5 s), and "If Quit cannot be pressed, leave the game" (off by default). Applied when hosting starts.
+- Config: `auto_quit`, `auto_quit_delay_seconds`, `leave_if_quit_fails`. Profile fields with defaults, so old profiles load unchanged.
+- Tests: `the_end_panel_is_recognised_at_any_window_shape_and_noise_is_not`, `the_quit_button_is_found_on_the_map_frame_grid`, `quit_is_clicked_after_two_sightings_and_the_delay_then_retried_then_left_only_if_enabled`.
+
+### Changed
+- Version 0.11.1 → 0.12.0.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+- Reference patches come from one 640×360 screenshot. Checked against that image (both ≈ 1.0) and random scenes in it (≤ 0.66 / 0.45). Different graphics settings (SD/HD) may score lower; the Activity line shows the scores for tuning.
+- Not known whether Warcraft III accepts the posted click; the real click is the fallback.
+
 ## 0.11.1 — 2026-11-26
 
 ### Fixed

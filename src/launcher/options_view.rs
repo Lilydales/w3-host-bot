@@ -64,7 +64,26 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
                     .text_size(14)
                     .on_toggle(Message::PlayerHost),
                 if profile.player_host {
-                    observer_stepper(profile.observer_slots)
+                    Element::from(column![
+                        observer_stepper(profile.observer_slots),
+                        toggler(profile.auto_quit)
+                            .label("Press Quit on the Direct Strike end panel")
+                            .size(21)
+                            .text_size(14)
+                            .on_toggle(Message::AutoQuit),
+                        delay_stepper(profile.auto_quit_delay_seconds),
+                        toggler(profile.leave_if_quit_fails)
+                            .label("If Quit cannot be pressed, leave the game (may count as a leave)")
+                            .size(21)
+                            .text_size(14)
+                            .on_toggle(Message::LeaveIfQuitFails),
+                        muted(
+                            "The bot watches the game window for the VICTORY/DEFEAT panel and clicks \
+                             its Quit button, so the result is recorded normally and the next lobby \
+                             is hosted. Your mouse may move briefly if the first click is ignored."
+                        ),
+                    ]
+                    .spacing(12))
                 } else {
                     column![].into()
                 },
@@ -199,5 +218,18 @@ fn observer_stepper<'a>(count: u8) -> Element<'a, Message> {
         .spacing(9)
         .align_y(Alignment::Center),
     ]
+    .into()
+}
+
+/// Seconds the end panel stays up before Quit is pressed (0..=60, steps of 5).
+fn delay_stepper<'a>(seconds: u64) -> Element<'a, Message> {
+    row![
+        super::widgets::action("−", Message::AutoQuitDelay(seconds.saturating_sub(5)), seconds > 0),
+        text(format!("{seconds} s")).size(16).width(44).center(),
+        super::widgets::action("+", Message::AutoQuitDelay((seconds + 5).min(60)), seconds < 60),
+        muted("Wait before pressing Quit"),
+    ]
+    .spacing(9)
+    .align_y(Alignment::Center)
     .into()
 }

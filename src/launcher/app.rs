@@ -56,6 +56,9 @@ pub enum Message {
     Private(bool),
     PlayerHost(bool),
     ObserverSlots(u8),
+    AutoQuit(bool),
+    AutoQuitDelay(u64),
+    LeaveIfQuitFails(bool),
     Speed(GameSpeed),
     RequireFull(bool),
     MapName,
@@ -388,6 +391,9 @@ impl App {
                     | Message::Private(_)
                     | Message::PlayerHost(_)
                     | Message::ObserverSlots(_)
+                    | Message::AutoQuit(_)
+                    | Message::AutoQuitDelay(_)
+                    | Message::LeaveIfQuitFails(_)
                     | Message::Speed(_)
                     | Message::MapName
                     | Message::Browse
@@ -550,6 +556,9 @@ impl App {
             Message::ObserverSlots(value) => {
                 self.form.profile.observer_slots = value.min(ghost_reforged::config::MAX_OBSERVER_SLOTS);
             }
+            Message::AutoQuit(value) => self.form.profile.auto_quit = value,
+            Message::AutoQuitDelay(value) => self.form.profile.auto_quit_delay_seconds = value.min(60),
+            Message::LeaveIfQuitFails(value) => self.form.profile.leave_if_quit_fails = value,
             Message::Speed(value) => {
                 self.form.profile.speed = value;
                 self.motion.close_menus();

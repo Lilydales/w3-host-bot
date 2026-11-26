@@ -44,6 +44,18 @@ pub struct Profile {
     /// 0 = filter off.
     #[serde(default)]
     pub min_ds_matches: u32,
+    /// Play as host: press the Direct Strike end panel's Quit button automatically.
+    #[serde(default = "private_by_default")]
+    pub auto_quit: bool,
+    #[serde(default = "auto_quit_delay")]
+    pub auto_quit_delay_seconds: u64,
+    /// Last resort when Quit cannot be pressed: leave the game (may count as a leave).
+    #[serde(default)]
+    pub leave_if_quit_fails: bool,
+}
+
+fn auto_quit_delay() -> u64 {
+    5
 }
 
 fn ds_patch() -> String {
@@ -113,6 +125,9 @@ impl Default for Profile {
             ds_patch_version: ds_patch(),
             min_ds_level: 0,
             min_ds_matches: 0,
+            auto_quit: true,
+            auto_quit_delay_seconds: auto_quit_delay(),
+            leave_if_quit_fails: false,
         }
     }
 }
@@ -153,6 +168,9 @@ impl Profile {
         }
         if !(1..=23).contains(&self.players) || self.countdown > 300 {
             return Err("Choose 1 to 23 players and a countdown from 0 to 300 seconds.".into());
+        }
+        if self.auto_quit_delay_seconds > 60 {
+            return Err("The auto-quit delay must be 0 to 60 seconds.".into());
         }
         if self.next_number == 0 {
             return Err("Next number must be at least 1.".into());
