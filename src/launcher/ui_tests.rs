@@ -92,6 +92,45 @@ impl Harness {
         }
         messages
     }
+    /// Clicks a grid of points on one built frame and returns the first point whose click
+    /// produces a wanted message. Layout-independent, so moving panels never breaks a test.
+    fn find(&mut self, app: &App, wanted: impl Fn(&Message) -> bool) -> Option<Point> {
+        let mut ui = UserInterface::build(
+            view::view(app),
+            self.size,
+            std::mem::take(&mut self.cache),
+            &mut self.renderer,
+        );
+        let mut found = None;
+        let mut y = 150.0;
+        'scan: while y < self.size.height {
+            let mut x = 4.0;
+            while x < self.size.width {
+                let position = Point::new(x, y);
+                let mut messages = Vec::new();
+                ui.update(
+                    &[
+                        Event::Mouse(mouse::Event::CursorMoved { position }),
+                        Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                        Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+                    ],
+                    mouse::Cursor::Available(position),
+                    &mut self.renderer,
+                    &mut clipboard::Null,
+                    &mut messages,
+                );
+                if messages.iter().any(&wanted) {
+                    found = Some(position);
+                    break 'scan;
+                }
+                x += 8.0;
+            }
+            y += 6.0;
+        }
+        self.cache = ui.into_cache();
+        found
+    }
+
     fn settle(&mut self, app: &mut App) {
         let _ = app.update(Message::Animate(Instant::now() + Duration::from_secs(1)));
         let _ = app.update(Message::Animate(Instant::now() + Duration::from_secs(2)));
@@ -145,7 +184,10 @@ fn rendered_menu_opens_selects_and_closes_without_clicking_underneath() {
     let mut harness = Harness::new();
     harness.settle(&mut app);
     harness.frame(&app, None, false, "hosting");
-    let messages = harness.frame(&app, Some(Point::new(620.0, 500.0)), true, "menu-pressed");
+    let opener = harness
+        .find(&app, |m| matches!(m, Message::Menu(Menu::StartRule)))
+        .expect("Auto start menu is reachable");
+    let messages = harness.frame(&app, Some(opener), true, "menu-pressed");
     assert!(
         messages
             .iter()
@@ -157,7 +199,10 @@ fn rendered_menu_opens_selects_and_closes_without_clicking_underneath() {
     }
     harness.settle(&mut app);
     harness.frame(&app, None, false, "menu-open");
-    let messages = harness.frame(&app, Some(Point::new(620.0, 421.0)), true, "menu-selection");
+    let choice = harness
+        .find(&app, |m| matches!(m, Message::RequireFull(true)))
+        .expect("Full is offered in the open menu");
+    let messages = harness.frame(&app, Some(choice), true, "menu-selection");
     assert!(
         messages
             .iter()
@@ -276,12 +321,10 @@ fn host_remains_clickable_at_the_minimum_window_size() {
     let mut harness = Harness::new();
     harness.size = Size::new(1000.0, 720.0);
     harness.settle(&mut app);
-    let messages = harness.frame(
-        &app,
-        Some(Point::new(300.0, 595.0)),
-        true,
-        "small-host-button",
-    );
+    let host = harness
+        .find(&app, |m| matches!(m, Message::Host))
+        .expect("Host is reachable at the minimum size");
+    let messages = harness.frame(&app, Some(host), true, "small-host-button");
     assert!(
         messages
             .iter()
@@ -315,7 +358,10 @@ fn occupied_player_rows_send_the_displayed_identity_when_kicked() {
     let expected = app.lobby.as_ref().unwrap().kick_target(1).unwrap();
     let mut harness = Harness::new();
     harness.settle(&mut app);
-    let messages = harness.frame(&app, Some(Point::new(1090.0, 317.0)), true, "kick-button");
+    let kick = harness
+        .find(&app, |m| matches!(m, Message::Kick(_)))
+        .expect("Kick is reachable");
+    let messages = harness.frame(&app, Some(kick), true, "kick-button");
     assert!(
         messages
             .iter()
@@ -325,7 +371,7 @@ fn occupied_player_rows_send_the_displayed_identity_when_kicked() {
     app.lobby.as_mut().unwrap().can_edit_slots = false;
     assert!(
         !harness
-            .frame(&app, Some(Point::new(1090.0, 317.0)), true, "kick-disabled")
+            .frame(&app, Some(kick), true, "kick-disabled")
             .iter()
             .any(|m| matches!(m, Message::Kick(_)))
     );
@@ -364,12 +410,10 @@ fn open_slot_menu_offers_computer_and_keeps_its_target_identity() {
         .1;
     let mut harness = Harness::new();
     harness.settle(&mut app);
-    let messages = harness.frame(
-        &app,
-        Some(Point::new(1090.0, 317.0)),
-        true,
-        "slot-menu-button",
-    );
+    let opener = harness
+        .find(&app, |m| matches!(m, Message::Menu(Menu::Slot(1))))
+        .expect("Slot menu is reachable");
+    let messages = harness.frame(&app, Some(opener), true, "slot-menu-button");
     assert!(
         messages
             .iter()
@@ -380,16 +424,33 @@ fn open_slot_menu_offers_computer_and_keeps_its_target_identity() {
     }
     harness.settle(&mut app);
     harness.frame(&app, None, false, "slot-menu-open");
-    let messages = harness.frame(
-        &app,
-        Some(Point::new(1060.0, 397.0)),
-        true,
-        "slot-computer-selected",
-    );
+    let choice = harness
+        .find(&app, |m| matches!(m, Message::Slot(request) if request == &expected))
+        .expect("Add computer is offered");
+    let messages = harness.frame(&app, Some(choice), true, "slot-computer-selected");
     assert!(
         messages
             .iter()
             .any(|m| matches!(m, Message::Slot(request) if request == &expected)),
         "{messages:?}"
     );
+}
+
+#[test]
+fn the_game_view_is_optional_and_the_status_bar_toggles_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut app = App::new(directory.path(), None);
+    assert!(!app.show_preview, "the lobby gets the full height by default");
+    let mut harness = Harness::new();
+    harness.settle(&mut app);
+    harness.frame(&app, None, false, "hosting-without-view");
+    let toggle = harness
+        .find(&app, |m| matches!(m, Message::TogglePreview))
+        .expect("the Game view toggle is in the status bar");
+    for message in harness.frame(&app, Some(toggle), true, "toggle-view") {
+        let _ = app.update(message);
+    }
+    assert!(app.show_preview);
+    harness.settle(&mut app);
+    harness.frame(&app, None, false, "hosting-with-view");
 }

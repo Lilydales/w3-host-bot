@@ -7,6 +7,21 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.15.0 — 2026-11-26
+
+### Changed (Hosting page redesign, step 2)
+- **Status bar across the top** (`hosting_view::status_bar`, height `STATUS_HEIGHT` 96): lobby name (large), players X / Y or "In game" / "Next game", the coloured status line, the notice line, a **Game view** toggle, and Host / Force start / Stop Hosting. The left panel no longer has a footer.
+- **Wider lobby:** columns are now settings 2 : lobby 3 (`SETTINGS_PORTION` / `LOBBY_PORTION`), previously 3 : 2.
+- **Game View is optional** (`App::show_preview`, `Message::TogglePreview`, off by default). Off: the Lobby / Current Game panel uses the full height. On: Game View appears under it as before.
+- Backdrop strips follow the new layout (`Coverage::Hosting(preview)`: gap under the status bar, gap between the columns, gap above Game View only when shown).
+- **UI tests no longer use fixed click coordinates** for moving controls: `Harness::find` clicks a grid on one built frame and returns the first point that produces the wanted message (Auto start menu, its "Full" item, Host, Kick, Slot menu and "Add computer"). Window controls and the update modal keep their fixed points.
+- Test: `the_game_view_is_optional_and_the_status_bar_toggles_it`; backdrop tests cover `Hosting(false)` and `Hosting(true)`.
+- Version 0.14.0 → 0.15.0.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+- Not visually checked. At 1000 px wide a long lobby name may wrap in the status bar.
+
 ## 0.14.0 — 2026-11-26
 
 ### Changed (Hosting page redesign, step 1)

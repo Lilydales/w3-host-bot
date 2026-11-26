@@ -86,6 +86,8 @@ pub enum Message {
     ToggleHostSettings,
     /// Show every recent kick instead of the latest three.
     ToggleKicks,
+    /// Show or hide the Game View panel under the lobby.
+    TogglePreview,
     PollHost,
     CloseRequested(iced::window::Id),
     Browse,
@@ -226,6 +228,8 @@ pub struct App {
     pub settings_open: bool,
     /// Recent kicks list shows all entries instead of the latest three.
     pub kicks_expanded: bool,
+    /// Game View panel under the lobby. Off by default so the lobby gets the full height.
+    pub show_preview: bool,
     /// When the current match started, to tell an early end from a full game.
     pub(super) game_started_at: Option<Instant>,
     /// The host's own BattleTag in player mode, shown first in the player lists.
@@ -286,6 +290,7 @@ impl App {
             in_game: false,
             settings_open: true,
             kicks_expanded: false,
+            show_preview: false,
             game_started_at: None,
             own_name: None,
             hosting_status: "Idle".into(),
@@ -459,6 +464,12 @@ impl App {
                 self.settings_open = !self.settings_open;
             }
             Message::ToggleKicks => self.kicks_expanded = !self.kicks_expanded,
+            Message::TogglePreview => {
+                self.show_preview = !self.show_preview;
+                if self.show_preview {
+                    self.preview.request();
+                }
+            }
             Message::Stop => {
                 self.ban_prompt = None;
                 self.hosting_requested = false;

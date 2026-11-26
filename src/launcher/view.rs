@@ -148,7 +148,11 @@ pub fn view(app: &App) -> Element<'_, Message> {
     let base = stack![
         bg::view(
             background,
-            bg::Coverage::for_page(app.page, app.motion.page.value(app.motion.now))
+            bg::Coverage::for_page(
+                app.page,
+                app.motion.page.value(app.motion.now),
+                app.show_preview
+            )
         ),
         foreground,
         container(

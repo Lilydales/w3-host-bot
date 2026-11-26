@@ -18,20 +18,26 @@ pub const BOTTOM: f32 = 24.0;
 pub const COLUMNS_GAP: f32 = 12.0;
 pub const PREVIEW_GAP: f32 = 14.0;
 pub const PREVIEW_HEIGHT: f32 = 244.0;
+/// Hosting page: status bar above the two columns, and the columns' width shares.
+pub const STATUS_HEIGHT: f32 = 96.0;
+pub const ROW_GAP: f32 = 12.0;
+pub const SETTINGS_PORTION: u16 = 2;
+pub const LOBBY_PORTION: u16 = 3;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Coverage {
     None,
-    Hosting,
+    /// The Hosting page; `true` when the Game View panel is shown under the lobby.
+    Hosting(bool),
     Page,
 }
 
 impl Coverage {
-    pub fn for_page(page: super::app::Page, progress: f32) -> Self {
+    pub fn for_page(page: super::app::Page, progress: f32, preview: bool) -> Self {
         if progress < 1.0 {
             Self::None
         } else if page == super::app::Page::Hosting {
-            Self::Hosting
+            Self::Hosting(preview)
         } else {
             Self::Page
         }
@@ -131,15 +137,25 @@ fn visible_regions(bounds: Rectangle, coverage: Coverage) -> Vec<Rectangle> {
         rect(bounds.width - RIGHT, HEADER, RIGHT, bounds.height - HEADER),
         rect(left, bounds.height - BOTTOM, body_width, BOTTOM),
     ];
-    if coverage == Coverage::Hosting {
-        let form_width = (body_width - COLUMNS_GAP) * 0.6;
-        regions.push(rect(left + form_width, HEADER, COLUMNS_GAP, body_height));
+    if let Coverage::Hosting(preview) = coverage {
+        let share = f32::from(SETTINGS_PORTION) / f32::from(SETTINGS_PORTION + LOBBY_PORTION);
+        let form_width = (body_width - COLUMNS_GAP) * share;
+        let columns_top = HEADER + STATUS_HEIGHT + ROW_GAP;
+        regions.push(rect(left, HEADER + STATUS_HEIGHT, body_width, ROW_GAP));
         regions.push(rect(
-            left + form_width + COLUMNS_GAP,
-            bounds.height - BOTTOM - PREVIEW_HEIGHT - PREVIEW_GAP,
-            body_width - form_width - COLUMNS_GAP,
-            PREVIEW_GAP,
+            left + form_width,
+            columns_top,
+            COLUMNS_GAP,
+            body_height - STATUS_HEIGHT - ROW_GAP,
         ));
+        if preview {
+            regions.push(rect(
+                left + form_width + COLUMNS_GAP,
+                bounds.height - BOTTOM - PREVIEW_HEIGHT - PREVIEW_GAP,
+                body_width - form_width - COLUMNS_GAP,
+                PREVIEW_GAP,
+            ));
+        }
     }
     regions
 }
@@ -194,9 +210,9 @@ mod tests {
         use super::super::app::Page;
         for page in [Page::Hosting, Page::Profiles, Page::Options, Page::Activity] {
             for progress in [0.0, 0.5, 0.999, 0.999_999] {
-                assert!(Coverage::for_page(page, progress) == Coverage::None);
+                assert!(Coverage::for_page(page, progress, false) == Coverage::None);
             }
-            assert!(Coverage::for_page(page, 1.0) != Coverage::None);
+            assert!(Coverage::for_page(page, 1.0, true) != Coverage::None);
         }
     }
 
@@ -204,7 +220,7 @@ mod tests {
     fn exposed_strips_cover_the_background_without_damaging_panel_interiors() {
         for (width, height) in [(1000.0, 720.0), (1180.0, 856.0), (1936.0, 1176.0)] {
             let bounds = Rectangle::with_size(Size::new(width, height));
-            for coverage in [Coverage::Hosting, Coverage::Page] {
+            for coverage in [Coverage::Hosting(false), Coverage::Hosting(true), Coverage::Page] {
                 let regions = visible_regions(bounds, coverage);
                 let area: f32 = regions.iter().map(Rectangle::area).sum();
                 assert!(

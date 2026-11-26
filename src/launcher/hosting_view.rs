@@ -1,6 +1,7 @@
 use super::{
     app::{App, Field, Message},
     art::{self, Icon},
+    backdrop_view as bg,
     effects,
     frame_art::Frame,
     motion::Menu,
@@ -157,19 +158,6 @@ pub fn view(app: &App) -> Element<'_, Message> {
         recent_activity(app),
     ]
     .spacing(12);
-    let mut footer = column![
-        row![controls, status_line(app)]
-            .spacing(16)
-            .align_y(Alignment::Center)
-    ]
-    .spacing(9);
-    if !app.notice.is_empty() {
-        footer = footer.push(text(&app.notice).size(14).color(if app.notice_error {
-            p::ERROR
-        } else {
-            p::MUTED
-        }));
-    }
     let left = effects::frame(
         container(
             column![
@@ -189,30 +177,111 @@ pub fn view(app: &App) -> Element<'_, Message> {
                     top: 0.0,
                     left: 24.0,
                     right: 24.0,
-                    bottom: 6.0
+                    bottom: 22.0
                 })
                 .height(Fill),
-                container(footer).height(136).padding(iced::Padding {
-                    top: 10.0,
-                    left: 24.0,
-                    right: 24.0,
-                    bottom: 25.0
-                })
             ]
             .height(Fill),
         )
         .height(Fill)
         .style(p::panel),
     );
-    row![
-        container(left).width(Length::FillPortion(3)).height(Fill),
+    // Game View is optional: the lobby gets the full height unless it is switched on.
+    let right: Element<'_, Message> = if app.show_preview {
         column![lobby(app), super::preview_view::thumbnail(app)]
-            .spacing(super::backdrop_view::PREVIEW_GAP)
+            .spacing(bg::PREVIEW_GAP)
             .height(Fill)
-            .width(Length::FillPortion(2))
+            .into()
+    } else {
+        lobby(app)
+    };
+    column![
+        status_bar(app, controls),
+        row![
+            container(left).width(Length::FillPortion(bg::SETTINGS_PORTION)).height(Fill),
+            container(right).width(Length::FillPortion(bg::LOBBY_PORTION)).height(Fill)
+        ]
+        .spacing(bg::COLUMNS_GAP)
+        .height(Fill)
     ]
-    .spacing(super::backdrop_view::COLUMNS_GAP)
+    .spacing(bg::ROW_GAP)
     .into()
+}
+
+/// Full-width bar above both columns: what is being hosted, its state, and the main
+/// buttons, so the essentials are visible without reading either panel.
+fn status_bar<'a>(app: &'a App, controls: iced::widget::Row<'a, Message>) -> Element<'a, Message> {
+    let idle = app.worker.is_none();
+    let (title, detail) = if let Some(lobby) = &app.lobby {
+        (
+            lobby.name.clone(),
+            format!("{} / {} players", lobby.humans, lobby.player_capacity()),
+        )
+    } else if app.in_game {
+        (
+            app.last_game
+                .as_ref()
+                .map(|game| game.lobby.clone())
+                .unwrap_or_else(|| "Match".into()),
+            "In game".into(),
+        )
+    } else {
+        let number = app
+            .form
+            .number
+            .trim()
+            .parse()
+            .unwrap_or(app.form.profile.next_number);
+        (
+            app.form.profile.lobby_name(number),
+            if idle { "Next game" } else { "Preparing" }.into(),
+        )
+    };
+    let mut info = column![
+        row![
+            text(title).font(art::LABEL).size(24).color(p::GOLD),
+            muted(detail)
+        ]
+        .spacing(14)
+        .align_y(Alignment::Center),
+        status_line(app),
+    ]
+    .spacing(4);
+    if !app.notice.is_empty() {
+        info = info.push(text(&app.notice).size(13).color(if app.notice_error {
+            p::ERROR
+        } else {
+            p::MUTED
+        }));
+    }
+    let preview = effects::hover(
+        button(
+            row![
+                art::icon(Icon::Eye, 22.0),
+                text(if app.show_preview { "Hide view" } else { "Game view" })
+                    .size(14)
+                    .color(p::GOLD)
+            ]
+            .spacing(6)
+            .align_y(Alignment::Center),
+        )
+        .padding([6, 10])
+        .style(p::inset)
+        .on_press(Message::TogglePreview),
+        true,
+    );
+    effects::frame(
+        container(
+            row![container(info).width(Fill), preview, controls.spacing(12)]
+                .spacing(14)
+                .align_y(Alignment::Center),
+        )
+        .padding([10, 22])
+        .width(Fill)
+        .height(bg::STATUS_HEIGHT)
+        .center_y(bg::STATUS_HEIGHT)
+        .style(p::panel),
+    )
 }
 
 fn lobby(app: &App) -> Element<'_, Message> {
