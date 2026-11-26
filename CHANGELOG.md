@@ -7,6 +7,27 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.6.0 — 2026-11-26
+
+### Added
+- **Kick reasons.** Before any kick the bot posts `Removing <player>: <reason>` in lobby chat, and the launcher lists it under **Recent kicks** on the Hosting page (last 8, newest first) and in Activity.
+  - Manual Kick: "Kicked by the host". Ban button: "Banned: <reason>". Ban list on rejoin: the saved reason, or "On the ban list".
+  - Direct Strike filter: which minimum failed, e.g. "level 3 is below 10 and 40 matches is below 100", or "not found on W3Champions".
+  - Vote kick: listed as "Vote kick passed" (chat already announces it).
+- `BanList::matching`, `KickTarget::name`, `ds_report::reject_reason`, `hosting::Event::Kicked`.
+- Tests: kick reason text, DS reject reasons, recent-kick list, observer setting.
+
+### Fixed
+- **Observer slots = 0 in player-host mode** now creates the game with observers off (`settingObservers` 0), so no observer team appears. Before, the game was created with "Full" observers and the bot closed each slot, leaving a column of Closed slots.
+- The launcher's own-slot row no longer always says "Observer"; in player-host mode it shows "Host · slot N".
+
+### Changed
+- Version 0.5.0 → 0.6.0. `PendingKick` is now a named struct carrying the reason.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+- Assumed: observers "None" removes the observer team in Warcraft III 3.0 lobbies. Observer slots 1–12 still use "Full" + closing extras.
+
 ## 0.5.0 — 2026-11-26
 
 ### Added
