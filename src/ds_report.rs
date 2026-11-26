@@ -11,6 +11,24 @@ pub const ORIGIN: &str = "https://www.ds-report.com";
 pub const REFERER: &str = "https://www.ds-report.com/";
 pub const DEFAULT_PATCH: &str = "5Direct Strike 6_5_13f";
 const TIMEOUT: Duration = Duration::from_secs(10);
+/// ds-report sits behind a bot filter that rejects library user agents (ureq's default is
+/// `ureq/2.x`). Present the request like the site's own page does.
+const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
+(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+/// First characters of a reply, on one line, for the Activity page.
+fn snippet(body: &str) -> String {
+    let flat: String = body
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    let flat = flat.split_whitespace().collect::<Vec<_>>().join(" ");
+    if flat.is_empty() {
+        "empty reply".into()
+    } else {
+        flat.chars().take(90).collect()
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DsStats {
@@ -84,26 +102,37 @@ pub fn lookup(tag: &str, patch: &str) -> Lookup {
 
 /// Like `lookup`, plus a short reason for the Activity page ("HTTP 403", "timed out"...).
 pub fn lookup_explained(tag: &str, patch: &str) -> (Lookup, String) {
-    let agent = ureq::AgentBuilder::new().timeout(TIMEOUT).build();
+    let agent = ureq::AgentBuilder::new()
+        .timeout(TIMEOUT)
+        .user_agent(USER_AGENT)
+        .build();
     let sent = agent
         .post(URL)
         .set("Content-Type", "application/json")
-        .set("Accept", "application/json")
+        .set("Accept", "application/json, text/plain, */*")
+        .set("Accept-Language", "en-US,en;q=0.9")
         .set("Origin", ORIGIN)
         .set("Referer", REFERER)
         .send_string(&request_body(tag, patch));
     match sent {
         Ok(response) => {
             let status = response.status();
-            match response.into_string().ok().and_then(|text| parse(&text)) {
+            let text = response.into_string().unwrap_or_default();
+            match parse(&text) {
                 Some(stats) => (Lookup::Found(stats), format!("HTTP {status}")),
-                None => (Lookup::Failed, format!("HTTP {status}, unreadable answer")),
+                None => (
+                    Lookup::Failed,
+                    format!("HTTP {status}, unreadable answer: {}", snippet(&text)),
+                ),
             }
         }
         Err(ureq::Error::Status(code @ (404 | 500), _)) => {
             (Lookup::NotFound, format!("HTTP {code}"))
         }
-        Err(ureq::Error::Status(code, _)) => (Lookup::Failed, format!("HTTP {code}")),
+        Err(ureq::Error::Status(code, response)) => {
+            let text = response.into_string().unwrap_or_default();
+            (Lookup::Failed, format!("HTTP {code}: {}", snippet(&text)))
+        }
         Err(ureq::Error::Transport(error)) => (
             Lookup::Failed,
             format!("network: {error}").chars().take(120).collect(),
@@ -166,6 +195,13 @@ mod tests {
         assert_eq!(body["BattleNetTag"], "Name#1234");
         assert_eq!(body["PatchVersion"], "5Direct Strike 6_5_13f");
         assert_eq!(body["PickOrder"], 0);
+    }
+
+    #[test]
+    fn reply_snippets_are_short_single_lines() {
+        assert_eq!(snippet(""), "empty reply");
+        assert_eq!(snippet("  <html>\n <title>Just a moment</title> "), "<html> <title>Just a moment</title>");
+        assert_eq!(snippet(&"x".repeat(500)).len(), 90);
     }
 
     #[test]

@@ -7,6 +7,20 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.13.1 — 2026-11-26
+
+### Fixed
+- **ds-report lookups failing ("Lookup failed").** "Failed" means ds-report answered with something other than stats or 404/500 (most likely a bot-filter 403/429 page) or the connection failed; the player name sent was correct (`L0v31yC0rn#1238`, confirmed in `w3-protocol.log`). Requests now send a browser User-Agent and Accept/Accept-Language headers like the site's own page; ureq's default `ureq/2.x` agent is commonly blocked.
+- Activity now includes the start of ds-report's reply on failure, e.g. `HTTP 403: <html> <title>Just a moment...`, so the exact cause is visible (`ds_report::snippet`).
+- Test: `reply_snippets_are_short_single_lines`.
+
+### Changed
+- Version 0.13.0 → 0.13.1.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+- Could not reach ds-report from the editing environment, so the header fix is untested. `w3-protocol.log` only records the game's UI socket, not ds-report traffic.
+
 ## 0.13.0 — 2026-11-26
 
 ### Changed (Hosting page layout)
