@@ -71,6 +71,12 @@ pub enum Message {
     BanReason(String),
     ConfirmBan,
     CancelBan,
+    /// Options page: BattleTag typed into the manual ban box.
+    BanFormTag(String),
+    BanFormReason(String),
+    BanFormSubmit,
+    /// Ban a player from the last started game.
+    BanLastPlayer(String),
     PollHost,
     CloseRequested(iced::window::Id),
     Browse,
@@ -183,6 +189,16 @@ pub struct App {
     pub ds_stats: std::collections::HashMap<String, Option<ghost_reforged::ds_report::DsStats>>,
     /// The player a Ban click is waiting to confirm, with the reason typed so far.
     pub ban_prompt: Option<(ghost_reforged::hosting::KickRequest, String)>,
+    /// Manual ban box on the Options page.
+    pub ban_form_tag: String,
+    pub ban_form_reason: String,
+    /// Guests of the latest lobby snapshot, kept so a started game can be remembered.
+    pub(super) last_roster: (String, Vec<String>),
+    /// Players of the most recently started game.
+    pub last_game: Option<super::ban_list::LastGame>,
+    /// Names banned from this launcher session (lowercase), to disable repeat buttons.
+    pub(super) recent_bans: std::collections::HashSet<String>,
+    pub(super) ban_file: PathBuf,
     pub hosting_status: String,
     pub(super) closing: Option<iced::window::Id>,
     probing: bool,
@@ -228,6 +244,12 @@ impl App {
             lobby: None,
             ds_stats: Default::default(),
             ban_prompt: None,
+            ban_form_tag: String::new(),
+            ban_form_reason: String::new(),
+            last_roster: Default::default(),
+            last_game: None,
+            recent_bans: Default::default(),
+            ban_file: Self::locate_ban_file(directory),
             hosting_status: "Idle".into(),
             closing: None,
             probing: false,
@@ -416,6 +438,12 @@ impl App {
                 }
             }
             Message::CancelBan => self.ban_prompt = None,
+            Message::BanFormTag(_)
+            | Message::BanFormReason(_)
+            | Message::BanFormSubmit
+            | Message::BanLastPlayer(_) => {
+                self.ban_message(&message);
+            }
             Message::ConfirmBan => {
                 if let Some((target, reason)) = self.ban_prompt.take()
                     && let Some(worker) = &self.worker
