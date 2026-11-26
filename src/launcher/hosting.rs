@@ -33,13 +33,7 @@ impl App {
             auto_start: true,
             commands: p.commands,
             stats_path: Some(self.data_directory.join("players.json")),
-            ban_path: Some(ghost_reforged::bans::BanList::locate(
-                std::env::current_exe()
-                    .ok()
-                    .as_deref()
-                    .and_then(std::path::Path::parent),
-                &self.data_directory,
-            )),
+            ban_path: Some(self.ban_path()),
             welcome: p.welcome,
             resume_lobby: true,
             // LobbyStart owns the game's native countdown. Never add a second one.
@@ -104,7 +98,10 @@ impl App {
                     self.hosting_status = text.clone();
                     self.log(&text);
                 }
-                Event::Lobby(lobby) => self.lobby = Some(lobby),
+                Event::Lobby(lobby) => {
+                    self.last_roster = (lobby.name.clone(), super::ban_list::guests(&lobby));
+                    self.lobby = Some(lobby);
+                }
                 Event::LobbyCleared => self.lobby = None,
                 Event::DsStats(name, stats) => {
                     self.ds_stats.insert(name, stats);
@@ -159,6 +156,13 @@ impl App {
             }
             Activity::GameStarted(name) => {
                 self.ds_stats.clear();
+                // Remember who played so they can be banned after the match.
+                if self.last_roster.0 == name && !self.last_roster.1.is_empty() {
+                    self.last_game = Some(super::ban_list::LastGame {
+                        lobby: name.clone(),
+                        players: self.last_roster.1.clone(),
+                    });
+                }
                 self.log_line(&format!("Game started · {name}"), true)
             }
             Activity::Joined(name) => self.log(&format!("{name} joined")),
