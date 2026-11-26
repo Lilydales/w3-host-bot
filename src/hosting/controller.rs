@@ -177,8 +177,9 @@ pub(super) fn run(
                     Err(error) => error,
                 };
                 let _ = tx.send(Event::Activity(Activity::Command(line)));
-                // Remove them now even if the list could not be saved.
-                manual_kick.request(target.clone(), &engine, now);
+                // Remove them now even if the list could not be saved. Also asks the
+                // game for a native ban; the list stays as the fallback.
+                manual_kick.request_ban(target.clone(), &engine, now);
             }
             if now != ban_checked {
                 ban_checked = now;
