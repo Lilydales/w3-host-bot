@@ -17,7 +17,7 @@ pub const RIGHT: f32 = 20.0;
 pub const BOTTOM: f32 = 24.0;
 pub const COLUMNS_GAP: f32 = 12.0;
 pub const PREVIEW_GAP: f32 = 14.0;
-pub const PREVIEW_HEIGHT: f32 = 286.0;
+pub const PREVIEW_HEIGHT: f32 = 244.0;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Coverage {

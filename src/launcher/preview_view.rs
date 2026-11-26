@@ -49,7 +49,7 @@ pub fn thumbnail(app: &App) -> Element<'_, Message> {
         button(
             column![
                 super::widgets::heading(caption, art::Icon::Eye),
-                container(picture(app, 184)).padding([0, 18]),
+                container(picture(app, 144)).padding([0, 18]),
             ]
             .spacing(6),
         )

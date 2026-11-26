@@ -143,10 +143,9 @@ pub fn view(app: &App) -> Element<'_, Message> {
                 toggle("Edit ▾"),
             ]
             .align_y(Alignment::Center),
-            text(app.form.profile.map_label()).size(15),
-            muted(settings_summary(app)),
+            settings_grid(app),
         ]
-        .spacing(4)
+        .spacing(6)
         .into()
     };
     let inputs = column![
@@ -157,7 +156,12 @@ pub fn view(app: &App) -> Element<'_, Message> {
         recent_kicks(app),
     ]
     .spacing(12);
-    let mut footer = column![controls].spacing(9);
+    let mut footer = column![
+        row![controls, status_line(app)]
+            .spacing(16)
+            .align_y(Alignment::Center)
+    ]
+    .spacing(9);
     if !app.notice.is_empty() {
         footer = footer.push(text(&app.notice).size(14).color(if app.notice_error {
             p::ERROR
@@ -383,6 +387,103 @@ fn toggle<'a>(caption: &'static str) -> Element<'a, Message> {
     )
 }
 
+/// Labelled rows shown while the host settings are folded: (label, value).
+pub(super) fn settings_rows(app: &App) -> Vec<(&'static str, String)> {
+    let profile = &app.form.profile;
+    let number = app.form.number.trim().parse().unwrap_or(profile.next_number);
+    let start = if profile.require_full {
+        "Full".to_string()
+    } else {
+        format!("{} players", app.form.players.trim())
+    };
+    let (level, matches) = filter_minimums(app);
+    let filter = match (level, matches) {
+        (0, 0) => "off".to_string(),
+        (level, 0) => format!("level {level}+"),
+        (0, matches) => format!("{matches}+ matches"),
+        (level, matches) => format!("level {level}+ · {matches}+ matches"),
+    };
+    let rehost = if profile.rehosts() { "on" } else { "OFF (stops after 1 game)" }.to_string();
+    let mut rows = vec![
+        ("Map", profile.map_label()),
+        ("Next game", profile.lobby_name(number)),
+        ("Auto start", start),
+        ("DS filter", filter),
+        ("Rehost", rehost),
+    ];
+    if profile.player_host {
+        rows.push((
+            "Auto-quit",
+            if profile.auto_quit {
+                format!("on · {} s", profile.auto_quit_delay_seconds)
+            } else {
+                "off".into()
+            },
+        ));
+    }
+    rows
+}
+
+/// The folded settings as two columns of label/value pairs.
+fn settings_grid(app: &App) -> Element<'_, Message> {
+    let rows = settings_rows(app);
+    let cell = |(label, value): &(&'static str, String)| {
+        row![
+            muted(*label).width(88),
+            text(value.clone()).size(14).width(Fill)
+        ]
+        .spacing(8)
+        .align_y(Alignment::Center)
+    };
+    // Map and game name are long: full width. The short values pair up.
+    let mut grid = column![].spacing(4);
+    let (wide, short) = rows.split_at(2.min(rows.len()));
+    for item in wide {
+        grid = grid.push(cell(item));
+    }
+    for pair in short.chunks(2) {
+        let mut line = row![].spacing(16);
+        for item in pair {
+            line = line.push(container(cell(item)).width(Fill));
+        }
+        if pair.len() == 1 {
+            line = line.push(space().width(Fill));
+        }
+        grid = grid.push(line);
+    }
+    grid.into()
+}
+
+/// Coloured dot and the bot's current state, next to Host / Stop.
+fn status_line(app: &App) -> Element<'_, Message> {
+    let (color, label) = if app.worker.is_none() {
+        (p::MUTED, app.hosting_status.as_str())
+    } else if app.in_game {
+        (p::GOLD, "In game")
+    } else if app.lobby.is_some() {
+        (p::ACCENT, app.hosting_status.as_str())
+    } else {
+        (iced::Color::from_rgb8(96, 150, 235), app.hosting_status.as_str())
+    };
+    let dot = container(space())
+        .width(10)
+        .height(10)
+        .style(move |_| container::Style {
+            background: Some(color.into()),
+            border: iced::Border {
+                radius: 5.0.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+    row![dot, text(label.to_string()).size(14).color(color).width(Fill)]
+        .spacing(8)
+        .align_y(Alignment::Center)
+        .width(Fill)
+        .into()
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
 /// One line describing the collapsed settings: game name, auto start and filter.
 pub(super) fn settings_summary(app: &App) -> String {
     let number = app.form.number.trim().parse().unwrap_or(app.form.profile.next_number);
@@ -558,7 +659,13 @@ fn players(app: &App) -> Element<'_, Message> {
             }
         })
         .collect();
-    let mut section = column![text("Players").size(16).color(p::GOLD)].spacing(6);
+    let count = guests.len() + usize::from(app.form.profile.player_host && app.own_name.is_some() && app.lobby.is_some());
+    let mut section = column![
+        text(if count > 0 { format!("Players ({count})") } else { "Players".into() })
+            .size(16)
+            .color(p::GOLD)
+    ]
+    .spacing(6);
     if guests.is_empty() && (app.own_name.is_none() || !app.form.profile.player_host || app.lobby.is_none()) {
         return section
             .push(muted(if app.in_game {
@@ -688,13 +795,38 @@ fn early_leavers<'a>(app: &App, game: &'a super::ban_list::LastGame, seconds: u6
     .into()
 }
 
+/// Recent kicks shown before "Show all".
+const KICKS_FOLDED: usize = 3;
+
 /// Why players were removed, newest first. Fills the space under the hosting form.
 fn recent_kicks(app: &App) -> Element<'_, Message> {
-    let mut list = column![text("Recent kicks").size(16).color(p::GOLD)].spacing(6);
-    if app.recent_kicks.is_empty() {
+    let total = app.recent_kicks.len();
+    let mut header = row![
+        text(if total > 0 { format!("Recent kicks ({total})") } else { "Recent kicks".into() })
+            .size(16)
+            .color(p::GOLD)
+            .width(Fill)
+    ]
+    .align_y(Alignment::Center);
+    if total > KICKS_FOLDED {
+        header = header.push(effects::hover(
+            button(
+                text(if app.kicks_expanded { "Show less ▴" } else { "Show all ▾" })
+                    .size(14)
+                    .color(p::GOLD),
+            )
+            .padding([0, 4])
+            .style(p::inset)
+            .on_press(Message::ToggleKicks),
+            true,
+        ));
+    }
+    let mut list = column![header].spacing(6);
+    if total == 0 {
         list = list.push(muted("Nobody has been kicked yet. Reasons appear here and in lobby chat."));
     }
-    for entry in &app.recent_kicks {
+    let shown = if app.kicks_expanded { total } else { total.min(KICKS_FOLDED) };
+    for entry in app.recent_kicks.iter().take(shown) {
         list = list.push(
             row![
                 muted(&entry.time).width(48),
@@ -753,6 +885,24 @@ mod tests {
         );
         app.form.profile.set_rehost(false);
         assert!(settings_summary(&app).ends_with("Rehost: OFF (stops after 1 game)"));
+    }
+
+    #[test]
+    fn folded_settings_grid_lists_every_setting_and_auto_quit_only_for_player_hosts() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut app = App::new(directory.path(), None);
+        app.form.profile.lobby_pattern = "Mix Mode DS #{n}".into();
+        app.form.number = "8".into();
+        app.form.min_ds_level = "10".into();
+        let rows = settings_rows(&app);
+        let get = |rows: &[(&str, String)], key: &str| rows.iter().find(|r| r.0 == key).map(|r| r.1.clone());
+        assert_eq!(get(&rows, "Next game").as_deref(), Some("Mix Mode DS #8"));
+        assert_eq!(get(&rows, "DS filter").as_deref(), Some("level 10+"));
+        assert!(get(&rows, "Auto-quit").is_none());
+        app.form.profile.player_host = true;
+        let rows = settings_rows(&app);
+        assert_eq!(get(&rows, "Auto-quit").as_deref(), Some("on · 5 s"));
+        assert_eq!(get(&rows, "Rehost").as_deref(), Some("on"));
     }
 
     #[test]

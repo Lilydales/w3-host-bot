@@ -7,6 +7,21 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.13.0 — 2026-11-26
+
+### Changed (Hosting page layout)
+- **Folded host settings are a labelled grid** instead of one grey line: Map and Next game on full rows, then Auto start · DS filter, Rehost · Auto-quit (Auto-quit only in Play-as-host). `hosting_view::settings_rows` / `settings_grid`. The expanded form is unchanged, so existing UI test coordinates still apply.
+- **Status beside Host / Force start / Stop**, with a coloured dot: grey idle/stopped, blue connecting, green lobby open, gold in game. Uses the existing `hosting_status`.
+- **Players (n)** and **Recent kicks (n)** show counts. Recent kicks shows the latest 3 with a **Show all ▾ / Show less ▴** link (`Message::ToggleKicks`, `App::kicks_expanded`), so it no longer pushes Players down.
+- **Right column:** Game View is shorter (`PREVIEW_HEIGHT` 286 → 244, picture 184 → 144 px), giving the Lobby / Current Game panel more rows without scrolling.
+- Theme, frames, fonts, colours, sidebar and all buttons/behaviour unchanged.
+- Test: `folded_settings_grid_lists_every_setting_and_auto_quit_only_for_player_hosts`.
+- Version 0.12.2 → 0.13.0.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`; UI tests render the pages at 1180×830 and 1000×720 and will catch layout panics.
+- Not visually checked. Send a screenshot and I will adjust spacing.
+
 ## 0.12.2 — 2026-11-26
 
 ### Fixed

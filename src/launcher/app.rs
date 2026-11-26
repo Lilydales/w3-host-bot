@@ -84,6 +84,8 @@ pub enum Message {
     BanEarlyLeaver(String),
     /// Show or hide the host settings on the Hosting page.
     ToggleHostSettings,
+    /// Show every recent kick instead of the latest three.
+    ToggleKicks,
     PollHost,
     CloseRequested(iced::window::Id),
     Browse,
@@ -222,6 +224,8 @@ pub struct App {
     /// Host settings section on the Hosting page is expanded. Collapses when hosting
     /// starts and opens again when it stops, so the live lists get the space.
     pub settings_open: bool,
+    /// Recent kicks list shows all entries instead of the latest three.
+    pub kicks_expanded: bool,
     /// When the current match started, to tell an early end from a full game.
     pub(super) game_started_at: Option<Instant>,
     /// The host's own BattleTag in player mode, shown first in the player lists.
@@ -281,6 +285,7 @@ impl App {
             recent_kicks: VecDeque::new(),
             in_game: false,
             settings_open: true,
+            kicks_expanded: false,
             game_started_at: None,
             own_name: None,
             hosting_status: "Idle".into(),
@@ -453,6 +458,7 @@ impl App {
                 self.motion.close_menus();
                 self.settings_open = !self.settings_open;
             }
+            Message::ToggleKicks => self.kicks_expanded = !self.kicks_expanded,
             Message::Stop => {
                 self.ban_prompt = None;
                 self.hosting_requested = false;
