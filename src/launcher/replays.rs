@@ -62,16 +62,67 @@ fn save_folder(data: &Path, folder: Option<&Path>) -> Result<(), String> {
     .map_err(|e| format!("The replay folder could not be saved: {e}"))
 }
 
+/// When a leave counts as early, in milliseconds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Window {
+    /// Leaving before this is always early.
+    pub limit_ms: u64,
+    /// Leaving within this of the end is not early (unless before `limit_ms`).
+    pub buffer_ms: u64,
+}
+
+impl Window {
+    pub fn from_minutes(limit: u32, buffer: u32) -> Self {
+        Self {
+            limit_ms: u64::from(limit) * 60_000,
+            buffer_ms: u64::from(buffer) * 60_000,
+        }
+    }
+
+    /// Whether a leave at `at_ms` in a match of `length_ms` counts as leaving early.
+    /// Everyone is recorded leaving at the very end; those never count.
+    pub fn is_early(self, at_ms: u64, length_ms: u64) -> bool {
+        at_ms + END_GRACE_MS < length_ms
+            && (at_ms < self.limit_ms || at_ms + self.buffer_ms < length_ms)
+    }
+}
+
+/// Leaves that count as early under `window`, in order.
+pub fn early<'a>(summary: &'a Summary, window: Window) -> Vec<&'a replay::Leave> {
+    summary
+        .leaves
+        .iter()
+        .filter(|leave| window.is_early(leave.at_ms, summary.length_ms))
+        .collect()
+}
+
+/// Leaves in the end buffer: not early, but before everyone left together.
+pub fn near_end<'a>(summary: &'a Summary, window: Window) -> Vec<&'a replay::Leave> {
+    summary
+        .leaves
+        .iter()
+        .filter(|leave| {
+            leave.at_ms + END_GRACE_MS < summary.length_ms
+                && !window.is_early(leave.at_ms, summary.length_ms)
+        })
+        .collect()
+}
+
 /// Who the rule bans: (player, leave time in ms). Never the host, never a name without a
-/// BattleTag (observers such as FLO), never someone who left with everyone at the end.
-pub fn to_ban(summary: &Summary, rule: EarlyLeaveRule, own: Option<&str>) -> Vec<(String, u64)> {
+/// BattleTag (observers such as FLO), never someone who left with everyone at the end or
+/// inside the end buffer.
+pub fn to_ban(
+    summary: &Summary,
+    rule: EarlyLeaveRule,
+    window: Window,
+    own: Option<&str>,
+) -> Vec<(String, u64)> {
     let limit = match rule {
         EarlyLeaveRule::Off => return Vec::new(),
-        EarlyLeaveRule::BeforeSevenMinutes => EARLY_END_SECONDS * 1000,
+        EarlyLeaveRule::BeforeSevenMinutes => window.limit_ms,
         EarlyLeaveRule::AnyEarlyLeave => u64::MAX,
     };
-    summary
-        .early_leavers(END_GRACE_MS)
+    early(summary, window)
         .into_iter()
         .filter(|leave| leave.at_ms < limit)
         .filter(|leave| leave.name.contains('#'))
@@ -203,6 +254,13 @@ impl App {
         self.replay_read(result);
     }
 
+    pub(super) fn early_window(&self) -> Window {
+        Window::from_minutes(
+            self.form.profile.early_leave_minutes,
+            self.form.profile.end_buffer_minutes,
+        )
+    }
+
     pub(super) fn replay_read(&mut self, result: Result<Summary, ReplayError>) {
         let summary = match result {
             Ok(summary) => summary,
@@ -219,7 +277,8 @@ impl App {
             }
         };
         self.replay_missing = false;
-        let leavers = summary.early_leavers(END_GRACE_MS);
+        let window = self.early_window();
+        let leavers = early(&summary, window);
         let mut line = format!("Replay · match {}", replay::clock(summary.length_ms));
         if leavers.is_empty() {
             line.push_str(" · nobody left early");
@@ -227,9 +286,16 @@ impl App {
         for leave in &leavers {
             line.push_str(&format!(" · {} left at {}", leave.name, replay::clock(leave.at_ms)));
         }
+        for leave in near_end(&summary, window) {
+            line.push_str(&format!(
+                " · {} left at {} (end buffer, not counted)",
+                leave.name,
+                replay::clock(leave.at_ms)
+            ));
+        }
         self.log(&line);
         let own = self.own_name.clone();
-        let bans = to_ban(&summary, self.form.profile.early_leave_rule, own.as_deref());
+        let bans = to_ban(&summary, self.form.profile.early_leave_rule, window, own.as_deref());
         let mut banned = Vec::new();
         for (name, at) in bans {
             let reason = format!("Left the game early ({})", replay::clock(at));
@@ -293,6 +359,16 @@ impl App {
                 self.form.profile.early_leave_rule = *rule;
                 Some(iced::Task::none())
             }
+            Message::EarlyLeaveMinutes(minutes) => {
+                self.form.profile.early_leave_minutes =
+                    (*minutes).clamp(1, super::profile::MAX_EARLY_LEAVE_MINUTES);
+                Some(iced::Task::none())
+            }
+            Message::EndBufferMinutes(minutes) => {
+                self.form.profile.end_buffer_minutes =
+                    (*minutes).min(super::profile::MAX_END_BUFFER_MINUTES);
+                Some(iced::Task::none())
+            }
             _ => None,
         }
     }
@@ -322,15 +398,47 @@ mod tests {
 
     #[test]
     fn the_rule_picks_who_to_ban_and_never_the_host_or_end_of_match_leavers() {
+        // 8-minute limit, no end buffer.
+        let window = Window::from_minutes(8, 0);
         let names = |rule| -> Vec<String> {
-            to_ban(&summary(), rule, Some("me#1")).into_iter().map(|b| b.0).collect()
+            to_ban(&summary(), rule, window, Some("me#1")).into_iter().map(|b| b.0).collect()
         };
         assert_eq!(names(EarlyLeaveRule::BeforeSevenMinutes), ["Early#2"]);
         assert_eq!(names(EarlyLeaveRule::AnyEarlyLeave), ["Early#2", "Late#3"]);
         assert!(names(EarlyLeaveRule::Off).is_empty());
         let mut observer = summary();
         observer.leaves[0].name = "FLO".into();
-        assert!(to_ban(&observer, EarlyLeaveRule::BeforeSevenMinutes, None).is_empty());
+        assert!(to_ban(&observer, EarlyLeaveRule::BeforeSevenMinutes, window, None).is_empty());
+    }
+
+    #[test]
+    fn the_end_buffer_forgives_late_leavers_but_never_leaves_before_the_limit() {
+        // Late#3 left at 23:56 of 28:01, 4:05 before the end.
+        let late = |buffer| {
+            to_ban(&summary(), EarlyLeaveRule::AnyEarlyLeave, Window::from_minutes(8, buffer), None)
+                .into_iter()
+                .map(|b| b.0)
+                .collect::<Vec<_>>()
+        };
+        assert!(late(4).contains(&"Late#3".to_string()), "4:05 before the end is outside 4 min");
+        assert!(!late(5).contains(&"Late#3".to_string()), "inside a 5 min buffer");
+        assert_eq!(near_end(&summary(), Window::from_minutes(8, 5)).len(), 1);
+        // A short match (someone left at 3:00, the map ended it at 3:10): the buffer
+        // covers the whole match, but leaving before 8 minutes is still early.
+        let short = Summary {
+            players: vec!["Q#1".into(), "S#2".into()],
+            leaves: vec![
+                Leave { name: "Q#1".into(), at_ms: 180_000 },
+                Leave { name: "S#2".into(), at_ms: 190_000 },
+            ],
+            length_ms: 190_000,
+        };
+        let window = Window::from_minutes(8, 2);
+        let names: Vec<_> = early(&short, window).iter().map(|l| l.name.clone()).collect();
+        assert_eq!(names, ["Q#1"], "the end-of-match leave of S#2 never counts");
+        // Defaults: 8 min limit, 2 min buffer.
+        let profile = super::super::profile::Profile::default();
+        assert_eq!((profile.early_leave_minutes, profile.end_buffer_minutes), (8, 2));
     }
 
     #[test]

@@ -251,11 +251,26 @@ fn early_leavers(app: &App) -> Element<'_, Message> {
         text("Early leavers").size(20),
         muted(
             "After each match you play as host, the bot reads LastReplay.w3g to see who left \
-             and when. Players banned this way get the reason \"Left the game early (m:ss)\" \
+             and when. \"Before the limit\" bans leavers before the limit below; \"Any early leave\" \
+             also bans later leavers outside the end buffer. Players banned this way get the reason \"Left the game early (m:ss)\" \
              and the native ban when they join a later lobby. The disabled button is the current rule."
         ),
         rules,
         muted(format!("Ban automatically: {}", current.label())),
+        minute_stepper(
+            app.form.profile.early_leave_minutes,
+            1,
+            super::profile::MAX_EARLY_LEAVE_MINUTES,
+            Message::EarlyLeaveMinutes,
+            "Limit: leaving before this always counts as early",
+        ),
+        minute_stepper(
+            app.form.profile.end_buffer_minutes,
+            0,
+            super::profile::MAX_END_BUFFER_MINUTES,
+            Message::EndBufferMinutes,
+            "End buffer: leaving in the last minutes is not counted (unless before the limit)",
+        ),
         row![
             muted(format!("Replay folder: {}", app.replay_folder_label())).width(Fill),
             super::widgets::action("Choose folder", Message::PickReplayFolder, true),
@@ -269,5 +284,24 @@ fn early_leavers(app: &App) -> Element<'_, Message> {
         .align_y(Alignment::Center),
     ]
     .spacing(10)
+    .into()
+}
+
+/// "−  8 min  +" with a caption; `on` builds the message for a new value.
+fn minute_stepper<'a>(
+    minutes: u32,
+    min: u32,
+    max: u32,
+    on: fn(u32) -> Message,
+    caption: &'a str,
+) -> Element<'a, Message> {
+    row![
+        super::widgets::action("−", on(minutes.saturating_sub(1).max(min)), minutes > min),
+        text(format!("{minutes} min")).size(16).width(60).center(),
+        super::widgets::action("+", on((minutes + 1).min(max)), minutes < max),
+        muted(caption),
+    ]
+    .spacing(9)
+    .align_y(Alignment::Center)
     .into()
 }

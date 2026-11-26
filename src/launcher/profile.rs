@@ -60,13 +60,32 @@ pub struct Profile {
     /// Play as host: who is banned automatically when the replay shows they left early.
     #[serde(default)]
     pub early_leave_rule: EarlyLeaveRule,
+    /// Leaving before this many minutes always counts as leaving early.
+    #[serde(default = "early_leave_minutes")]
+    pub early_leave_minutes: u32,
+    /// Leaving in the last this-many minutes of a match does not count (the result is
+    /// already decided), unless it is also before `early_leave_minutes`.
+    #[serde(default = "end_buffer_minutes")]
+    pub end_buffer_minutes: u32,
+}
+
+pub const MAX_EARLY_LEAVE_MINUTES: u32 = 30;
+pub const MAX_END_BUFFER_MINUTES: u32 = 10;
+
+fn early_leave_minutes() -> u32 {
+    8
+}
+
+fn end_buffer_minutes() -> u32 {
+    2
 }
 
 /// Which early leavers (read from the match replay) are banned automatically.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum EarlyLeaveRule {
-    /// Left before 7 minutes, which ends a Direct Strike match.
+    /// Left before the early-leave limit (`Profile::early_leave_minutes`, default 8).
+    /// The serialised name is kept from 0.16.0 so saved profiles still load.
     #[default]
     BeforeSevenMinutes,
     /// Left at any time before the match ended.
@@ -80,7 +99,7 @@ impl EarlyLeaveRule {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::BeforeSevenMinutes => "Before 7 min",
+            Self::BeforeSevenMinutes => "Before the limit",
             Self::AnyEarlyLeave => "Any early leave",
             Self::Off => "Off (list only)",
         }
@@ -163,6 +182,8 @@ impl Default for Profile {
             leave_if_quit_fails: false,
             player_rehost: true,
             early_leave_rule: EarlyLeaveRule::default(),
+            early_leave_minutes: early_leave_minutes(),
+            end_buffer_minutes: end_buffer_minutes(),
         }
     }
 }
@@ -220,6 +241,11 @@ impl Profile {
         }
         if !(1..=23).contains(&self.players) || self.countdown > 300 {
             return Err("Choose 1 to 23 players and a countdown from 0 to 300 seconds.".into());
+        }
+        if !(1..=MAX_EARLY_LEAVE_MINUTES).contains(&self.early_leave_minutes)
+            || self.end_buffer_minutes > MAX_END_BUFFER_MINUTES
+        {
+            return Err("Early-leave minutes must be 1 to 30; the end buffer 0 to 10.".into());
         }
         if self.auto_quit_delay_seconds > 60 {
             return Err("The auto-quit delay must be 0 to 60 seconds.".into());

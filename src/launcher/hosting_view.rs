@@ -854,7 +854,9 @@ fn replay_leavers<'a>(
     summary: &'a ghost_reforged::replay::Summary,
 ) -> Element<'a, Message> {
     use ghost_reforged::replay::clock;
-    let leavers = summary.early_leavers(super::replays::END_GRACE_MS);
+    let window = app.early_window();
+    let leavers = super::replays::early(summary, window);
+    let near_end = super::replays::near_end(summary, window);
     let own = app.own_name.as_deref();
     let mut list = column![muted(format!(
         "Match length {} · from the replay",
@@ -870,7 +872,7 @@ fn replay_leavers<'a>(
         let mut line = row![
             text(format!("{} left at {} ({before_end} before the end)", leave.name, clock(leave.at_ms)))
                 .size(14)
-                .color(if leave.at_ms < super::ban_list::EARLY_END_SECONDS * 1000 {
+                .color(if leave.at_ms < window.limit_ms {
                     p::ERROR
                 } else {
                     p::TEXT
@@ -892,6 +894,14 @@ fn replay_leavers<'a>(
             ));
         }
         list = list.push(line);
+    }
+    for leave in near_end {
+        list = list.push(muted(format!(
+            "{} left at {} · in the last {} min, not counted",
+            leave.name,
+            clock(leave.at_ms),
+            window.buffer_ms / 60_000
+        )));
     }
     container(list).padding(10).style(p::panel).into()
 }

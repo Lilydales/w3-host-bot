@@ -7,6 +7,22 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.17.0 — 2026-11-26
+
+### Added
+- **End buffer for early leavers.** Leaving in the last *N* minutes of a match (default **2**) no longer counts as leaving early, since the result is already decided. Leaving before the **limit** (default **8 min**) always counts, even when the buffer would cover it (short matches). `replays::Window { limit_ms, buffer_ms }`, `Window::is_early`, `early()`, `near_end()`.
+- Options → Early leavers: **Limit** stepper (1–30 min) and **End buffer** stepper (0–10 min). Profile fields `early_leave_minutes` (default 8) and `end_buffer_minutes` (default 2); old profiles load with the defaults.
+- Last game card lists end-buffer leavers in grey as "in the last N min, not counted"; Activity marks them "(end buffer, not counted)".
+- Test: `the_end_buffer_forgives_late_leavers_but_never_leaves_before_the_limit`.
+
+### Changed
+- Rule *Before 7 min* is now **Before the limit** and uses the limit setting (serialised name unchanged, so 0.16.0 profiles still load).
+- The "match ended early" marker on the Last game card still uses the map's own 7-minute rule.
+- Version 0.16.0 → 0.17.0.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+
 ## 0.16.0 — 2026-11-26
 
 ### Added

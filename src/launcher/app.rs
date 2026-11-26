@@ -94,6 +94,8 @@ pub enum Message {
     /// Forget the chosen replay folder and find it automatically.
     AutoReplayFolder,
     EarlyLeaveRule(super::profile::EarlyLeaveRule),
+    EarlyLeaveMinutes(u32),
+    EndBufferMinutes(u32),
     PollHost,
     CloseRequested(iced::window::Id),
     Browse,
