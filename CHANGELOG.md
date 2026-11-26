@@ -7,6 +7,13 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.17.3 - 2026-11-27
+
+### Fixed
+- Windows release CI excludes the two native audio integration tests that require an active playback endpoint. All other tests remain in the release gate. Run the audio tests separately on a Windows machine with an active playback endpoint.
+- The backdrop test tolerates subpixel rounding when comparing clipped rectangles, without relaxing its overlap or coverage checks. The replay observer test now supplies the host identity so it tests observer exclusion without treating the host as an eligible candidate.
+- Bumped the bot and Windows installer to 0.17.3. No runtime behaviour changed. Windows tests have not been rerun in the editing environment.
+
 ## 0.17.2 - 2026-11-27
 
 ### Fixed

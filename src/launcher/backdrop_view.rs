@@ -228,7 +228,16 @@ mod tests {
                     "Too much background redraw: {area}"
                 );
                 for (index, region) in regions.iter().enumerate() {
-                    assert_eq!(bounds.intersection(region), Some(*region));
+                    let clipped = bounds.intersection(region).expect("strip must intersect bounds");
+                    // Clipping recomputes dimensions in f32; allow subpixel rounding only.
+                    let epsilon = 0.001;
+                    assert!(
+                        (clipped.x - region.x).abs() <= epsilon
+                            && (clipped.y - region.y).abs() <= epsilon
+                            && (clipped.width - region.width).abs() <= epsilon
+                            && (clipped.height - region.height).abs() <= epsilon,
+                        "strip {region:?} extends outside {bounds:?}: {clipped:?}"
+                    );
                     for neighbor in &regions[index + 1..] {
                         assert!(region.intersection(neighbor).is_none_or(|r| r.area() < 0.1));
                     }

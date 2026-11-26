@@ -408,7 +408,10 @@ mod tests {
         assert!(names(EarlyLeaveRule::Off).is_empty());
         let mut observer = summary();
         observer.leaves[0].name = "FLO".into();
-        assert!(to_ban(&observer, EarlyLeaveRule::BeforeSevenMinutes, window, None).is_empty());
+        assert!(
+            to_ban(&observer, EarlyLeaveRule::BeforeSevenMinutes, window, Some("me#1")).is_empty(),
+            "FLO is not a ban candidate, and the known host remains excluded"
+        );
     }
 
     #[test]
