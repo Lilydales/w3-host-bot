@@ -38,6 +38,8 @@ pub(super) struct DsCheck {
     verdicts: std::collections::BTreeMap<String, Lookup>,
     /// The host's own BattleTag, looked up for display only (never filtered or kicked).
     own: Option<String>,
+    /// Why a lookup ended as it did ("HTTP 403"...), shown in Activity for failures.
+    notes: (Sender<(String, String)>, Receiver<(String, String)>),
 }
 
 impl Default for DsCheck {
@@ -54,6 +56,7 @@ impl Default for DsCheck {
             last_sent: None,
             verdicts: Default::default(),
             own: None,
+            notes: mpsc::channel(),
         }
     }
 }
@@ -95,15 +98,17 @@ impl DsCheck {
         if self.pending.len() >= MAX_IN_FLIGHT {
             return false;
         }
-        let (sender, tag, patch) = (
+        let (sender, notes, tag, patch) = (
             self.sender.clone(),
+            self.notes.0.clone(),
             name.to_owned(),
             config.ds_patch_version.clone(),
         );
         let started = thread::Builder::new()
             .name("ghost-ds-lookup".into())
             .spawn(move || {
-                let result = ds_report::lookup(&tag, &patch);
+                let (result, note) = ds_report::lookup_explained(&tag, &patch);
+                let _ = notes.send((tag.clone(), note));
                 let _ = sender.send((tag, result));
             });
         if started.is_err() {
@@ -120,15 +125,17 @@ impl DsCheck {
         if !name.contains('#') || self.own.as_deref() == Some(name) {
             return;
         }
-        let (sender, tag, patch) = (
+        let (sender, notes, tag, patch) = (
             self.sender.clone(),
+            self.notes.0.clone(),
             name.to_owned(),
             config.ds_patch_version.clone(),
         );
         if thread::Builder::new()
             .name("ghost-ds-lookup".into())
             .spawn(move || {
-                let result = ds_report::lookup(&tag, &patch);
+                let (result, note) = ds_report::lookup_explained(&tag, &patch);
+                let _ = notes.send((tag.clone(), note));
                 let _ = sender.send((tag, result));
             })
             .is_ok()
@@ -167,27 +174,40 @@ impl DsCheck {
         events: &Sender<Event>,
         announcements: &mut Announcements,
     ) {
+        let mut notes = std::collections::BTreeMap::new();
+        while let Ok((name, note)) = self.notes.1.try_recv() {
+            notes.insert(name, note);
+        }
         while let Ok((name, result)) = self.results.try_recv() {
+            let note = notes.remove(&name).unwrap_or_default();
             if self.own.as_deref() == Some(name.as_str()) && !self.pending.contains(&name) {
                 // Display only: the host is never filtered, kicked or announced.
                 let detail = match result {
                     Lookup::Found(s) => format!("Lv. {} ({} matches)", s.level, s.matches),
-                    Lookup::NotFound => "not found (HTTP 404/500)".into(),
-                    Lookup::Failed => "lookup failed (network or unreadable answer)".into(),
+                    Lookup::NotFound => "not found".into(),
+                    Lookup::Failed => "lookup failed".into(),
                 };
                 let _ = events.send(Event::Activity(Activity::Command(format!(
-                    "DS lookup for you · {name} · {detail}"
+                    "DS lookup for you · {name} · {detail} · {note}"
                 ))));
-                if result != Lookup::Failed {
-                    let _ = events.send(Event::DsStats(name, result.stats()));
-                }
+                let _ = events.send(match result {
+                    Lookup::Failed => Event::DsFailed(name),
+                    _ => Event::DsStats(name, result.stats()),
+                });
                 continue;
             }
             if !self.pending.remove(&name) {
                 continue; // The player left, or the lobby changed, while it ran.
             }
+            if !matches!(result, Lookup::Found(_)) {
+                let _ = events.send(Event::Activity(Activity::Command(format!(
+                    "DS lookup · {name} · {} · {note}",
+                    if result == Lookup::Failed { "failed" } else { "not found" }
+                ))));
+            }
             if result == Lookup::Failed {
                 // No data and no verdict: fall back to the ordinary welcome.
+                let _ = events.send(Event::DsFailed(name.clone()));
                 announcements.joined(&name);
                 continue;
             }
@@ -344,7 +364,9 @@ mod tests {
         let mut announcements = Announcements::default();
         check.poll(&config, 1, &events, &mut announcements);
         assert!(check.kicks.is_empty() && check.messages.is_empty());
-        assert!(received.try_recv().is_err());
+        let all: Vec<_> = received.try_iter().collect();
+        assert!(all.iter().any(|e| matches!(e, Event::DsFailed(n) if n == "Net#1")));
+        assert!(!all.iter().any(|e| matches!(e, Event::DsStats(..))));
     }
 
     #[test]

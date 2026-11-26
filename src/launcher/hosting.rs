@@ -125,7 +125,11 @@ impl App {
                 Event::Kicked(name, reason) => self.record_kick(name, reason),
                 Event::MatchEnded => self.match_ended(),
                 Event::DsStats(name, stats) => {
+                    self.ds_failed.remove(&name);
                     self.ds_stats.insert(name, stats);
+                }
+                Event::DsFailed(name) => {
+                    self.ds_failed.insert(name);
                 }
                 Event::Reserve(number) => {
                     let result = self.reserve_number(number);

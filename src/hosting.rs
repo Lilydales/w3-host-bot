@@ -93,6 +93,8 @@ pub enum Event {
     LobbyCleared,
     /// Direct Strike lookup result for a player; `None` means not on W3Champions.
     DsStats(String, Option<crate::ds_report::DsStats>),
+    /// The ds-report lookup for a player failed (network, blocked, unreadable answer).
+    DsFailed(String),
     /// A player was removed from the lobby: (player, reason).
     Kicked(String, String),
     /// The host's own match ended (player mode). The launcher times it to spot early ends.

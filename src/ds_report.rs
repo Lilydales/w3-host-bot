@@ -79,6 +79,11 @@ pub fn validate_patch(patch: &str) -> Result<(), String> {
 
 /// Blocking. Call from a background thread only.
 pub fn lookup(tag: &str, patch: &str) -> Lookup {
+    lookup_explained(tag, patch).0
+}
+
+/// Like `lookup`, plus a short reason for the Activity page ("HTTP 403", "timed out"...).
+pub fn lookup_explained(tag: &str, patch: &str) -> (Lookup, String) {
     let agent = ureq::AgentBuilder::new().timeout(TIMEOUT).build();
     let sent = agent
         .post(URL)
@@ -88,13 +93,21 @@ pub fn lookup(tag: &str, patch: &str) -> Lookup {
         .set("Referer", REFERER)
         .send_string(&request_body(tag, patch));
     match sent {
-        Ok(response) => response
-            .into_string()
-            .ok()
-            .and_then(|text| parse(&text))
-            .map_or(Lookup::Failed, Lookup::Found),
-        Err(ureq::Error::Status(404 | 500, _)) => Lookup::NotFound,
-        Err(_) => Lookup::Failed,
+        Ok(response) => {
+            let status = response.status();
+            match response.into_string().ok().and_then(|text| parse(&text)) {
+                Some(stats) => (Lookup::Found(stats), format!("HTTP {status}")),
+                None => (Lookup::Failed, format!("HTTP {status}, unreadable answer")),
+            }
+        }
+        Err(ureq::Error::Status(code @ (404 | 500), _)) => {
+            (Lookup::NotFound, format!("HTTP {code}"))
+        }
+        Err(ureq::Error::Status(code, _)) => (Lookup::Failed, format!("HTTP {code}")),
+        Err(ureq::Error::Transport(error)) => (
+            Lookup::Failed,
+            format!("network: {error}").chars().take(120).collect(),
+        ),
     }
 }
 

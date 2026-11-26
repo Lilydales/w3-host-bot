@@ -7,6 +7,21 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.11.1 — 2026-11-26
+
+### Fixed
+- **"Checking…" forever when a ds-report lookup fails.** Failed lookups (blocked, network error, unreadable answer) now send `Event::DsFailed`; the row shows **Lookup failed** instead of Checking…, for the host and for guests.
+- Activity explains every lookup that did not find stats: `DS lookup · Name · failed · HTTP 403` / `not found · HTTP 404` / `network: …` (`ds_report::lookup_explained`). The host line reads `DS lookup for you · Name · <result> · <reason>`.
+
+### Added
+- `extras/war3map-autoquit.j` is delivered separately (not in the repo): Direct Strike map change that ends the match for everyone 20 s after the end panel, as if each player pressed Quit. The bot then sees the results screen and rehosts as before.
+
+### Changed
+- Version 0.11.0 → 0.11.1.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+
 ## 0.11.0 — 2026-11-26
 
 ### Added

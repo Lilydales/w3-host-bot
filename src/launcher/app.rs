@@ -198,6 +198,8 @@ pub struct App {
     pub lobby: Option<Snapshot>,
     /// Direct Strike lookups for players in the current lobby (`None` = not on W3Champions).
     pub ds_stats: std::collections::HashMap<String, Option<ghost_reforged::ds_report::DsStats>>,
+    /// Players whose ds-report lookup failed; shown as "Lookup failed", not "Checking…".
+    pub ds_failed: std::collections::HashSet<String>,
     /// The player a Ban click is waiting to confirm, with the reason typed so far.
     pub ban_prompt: Option<(ghost_reforged::hosting::KickRequest, String)>,
     /// Manual ban box on the Options page.
@@ -265,6 +267,7 @@ impl App {
             worker: None,
             lobby: None,
             ds_stats: Default::default(),
+            ds_failed: Default::default(),
             ban_prompt: None,
             ban_form_tag: String::new(),
             ban_form_reason: String::new(),

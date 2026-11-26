@@ -501,7 +501,12 @@ fn stats_table<'a>(
         let you = own.as_ref() == Some(&name);
         let (level, matches, status, color) =
             player_row(&name, app.ds_stats.get(&name).copied(), min_level, min_matches);
-        let status = if you && status != "Checking…" && status != "No BattleTag" {
+        let (status, color) = if status == "Checking…" && app.ds_failed.contains(&name) {
+            ("Lookup failed", p::GOLD)
+        } else {
+            (status, color)
+        };
+        let status = if you && !matches!(status, "Checking…" | "No BattleTag" | "Lookup failed") {
             if status == "Not on W3C" { "You · not found" } else { "You" }
         } else {
             status
