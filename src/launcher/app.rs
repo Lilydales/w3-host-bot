@@ -208,6 +208,8 @@ pub struct App {
     pub(super) ban_file: PathBuf,
     /// Newest first, at most 8, kept for the launcher session.
     pub recent_kicks: VecDeque<KickEntry>,
+    /// A game started from our lobby is being played (cleared by the next lobby).
+    pub in_game: bool,
     pub hosting_status: String,
     pub(super) closing: Option<iced::window::Id>,
     probing: bool,
@@ -260,6 +262,7 @@ impl App {
             recent_bans: Default::default(),
             ban_file: Self::locate_ban_file(directory),
             recent_kicks: VecDeque::new(),
+            in_game: false,
             hosting_status: "Idle".into(),
             closing: None,
             probing: false,

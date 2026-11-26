@@ -210,6 +210,10 @@ pub(super) fn run(
                     target.name()
                 ))));
             }
+            if matches!(control, Some(Control::Settings(_))) {
+                // Settings were applied by `dispatch` above; re-check the current lobby.
+                ds.refilter(&engine.config, now, tx);
+            }
             ds.poll(&engine.config, now, tx, &mut announcements);
             if identity_ok {
                 ds.kick(&engine, &mut manual_kick, now);

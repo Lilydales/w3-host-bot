@@ -8,6 +8,7 @@ use super::{
     select::select,
     widgets::{action, field, field_enabled, heading, label, muted},
 };
+use ghost_reforged::ds_report::{self, DsStats, Lookup};
 use iced::{
     Alignment, Element, Fill, Length,
     widget::{column, container, row, scrollable, space, text, text_input},
@@ -124,6 +125,9 @@ pub fn view(app: &App) -> Element<'_, Message> {
             start_rule
         ]
         .spacing(24),
+        ds_filter(app),
+        players(app),
+        current_game(app),
         recent_kicks(app),
     ]
     .spacing(12);
@@ -198,20 +202,8 @@ fn lobby(app: &App) -> Element<'_, Message> {
             } else {
                 slot.name.clone()
             };
-            let stats = (slot.status == 2 && !slot.computer)
-                .then(|| app.ds_stats.get(&slot.name))
-                .flatten();
-            let name: Element<'_, Message> = match stats {
-                Some(stats) => row![
-                    text(name).size(15),
-                    muted(ghost_reforged::ds_report::DsStats::badge(*stats))
-                ]
-                .spacing(8)
-                .align_y(Alignment::Center)
-                .width(Fill)
-                .into(),
-                None => text(name).size(15).width(Fill).into(),
-            };
+            // Levels are shown in the Players section, not squeezed beside the name.
+            let name = text(name).size(15).width(Fill);
             let mut item = row![muted(format!("{:02}", slot.number + 1)).width(30), name]
             .spacing(8)
             .align_y(Alignment::Center);
@@ -347,6 +339,181 @@ fn host_role(own: Option<&ghost_reforged::hosting::Slot>, player_host: bool) -> 
     }
 }
 
+/// One row of the Players section: (level, matches, status, colour).
+pub(super) fn player_row(
+    name: &str,
+    lookup: Option<Option<DsStats>>,
+    min_level: u32,
+    min_matches: u32,
+) -> (String, String, &'static str, iced::Color) {
+    let filter_on = min_level > 0 || min_matches > 0;
+    let dash = || ("—".to_string(), "—".to_string());
+    match lookup {
+        Some(Some(stats)) => {
+            let status = if ds_report::rejects(min_level, min_matches, Lookup::Found(stats)) {
+                ("Below minimum", p::ERROR)
+            } else if filter_on {
+                ("Passed", p::ACCENT)
+            } else {
+                ("Found", p::ACCENT)
+            };
+            (stats.level.to_string(), stats.matches.to_string(), status.0, status.1)
+        }
+        Some(None) => {
+            let (level, matches) = dash();
+            let color = if filter_on { p::ERROR } else { p::MUTED };
+            (level, matches, "Not on W3C", color)
+        }
+        None if !name.contains('#') => {
+            let (level, matches) = dash();
+            (level, matches, "No BattleTag", p::MUTED)
+        }
+        None => {
+            let (level, matches) = dash();
+            (level, matches, "Checking…", p::MUTED)
+        }
+    }
+}
+
+fn filter_minimums(app: &App) -> (u32, u32) {
+    (
+        app.form.min_ds_level.trim().parse().unwrap_or(0),
+        app.form.min_ds_matches.trim().parse().unwrap_or(0),
+    )
+}
+
+/// Live Direct Strike filter: editable while hosting, applied about half a second after typing.
+fn ds_filter(app: &App) -> Element<'_, Message> {
+    let (level, matches) = filter_minimums(app);
+    let summary = match (level, matches) {
+        (0, 0) => "Filter off".to_string(),
+        (level, 0) => format!("Kicking below level {level}"),
+        (0, matches) => format!("Kicking below {matches} matches"),
+        (level, matches) => format!("Kicking below level {level} or {matches} matches"),
+    };
+    column![
+        row![
+            text("Direct Strike filter").size(16).color(p::GOLD).width(Fill),
+            muted(summary)
+        ]
+        .align_y(Alignment::Center),
+        row![
+            field("Min level (0 = off)", &app.form.min_ds_level, Field::DsLevel),
+            field("Min matches (0 = off)", &app.form.min_ds_matches, Field::DsMatches),
+        ]
+        .spacing(24),
+        muted(if app.worker.is_some() {
+            "Live: changes apply to the current lobby, including players already in it."
+        } else {
+            "Changes apply straight away, also while hosting."
+        }),
+    ]
+    .spacing(6)
+    .into()
+}
+
+fn stats_table<'a>(
+    app: &'a App,
+    names: impl Iterator<Item = String>,
+    ban: bool,
+) -> iced::widget::Column<'a, Message> {
+    let (min_level, min_matches) = filter_minimums(app);
+    let mut header = row![
+        muted("Player").width(Fill),
+        muted("Level").width(52),
+        muted("Matches").width(66),
+        muted("Status").width(112),
+    ]
+    .spacing(8);
+    if ban {
+        header = header.push(space().width(78));
+    }
+    let mut table = column![header].spacing(6);
+    for name in names {
+        let (level, matches, status, color) =
+            player_row(&name, app.ds_stats.get(&name).copied(), min_level, min_matches);
+        let mut line = row![
+            text(name.clone()).size(14).width(Fill),
+            text(level).size(14).width(52),
+            text(matches).size(14).width(66),
+            text(status).size(14).color(color).width(112),
+        ]
+        .spacing(8)
+        .align_y(Alignment::Center);
+        if ban {
+            let banned = app.is_recently_banned(&name);
+            line = line.push(
+                container(action(
+                    if banned { "Banned" } else { "Ban" },
+                    Message::BanLastPlayer(name),
+                    !banned,
+                ))
+                .width(78),
+            );
+        }
+        table = table.push(line);
+    }
+    table
+}
+
+/// Everyone in the lobby with their Direct Strike level and filter verdict.
+fn players(app: &App) -> Element<'_, Message> {
+    let guests: Vec<String> = app
+        .lobby
+        .iter()
+        .flat_map(|lobby| lobby.slots.iter())
+        .filter(|s| s.status == 2 && !s.computer && !s.own)
+        .map(|s| {
+            if s.name.is_empty() {
+                format!("Player {}", s.number + 1)
+            } else {
+                s.name.clone()
+            }
+        })
+        .collect();
+    let mut section = column![text("Players").size(16).color(p::GOLD)].spacing(6);
+    if guests.is_empty() {
+        return section
+            .push(muted(if app.in_game {
+                "The game is running; its players are listed below."
+            } else {
+                "No players in the lobby yet. Levels come from ds-report.com."
+            }))
+            .into();
+    }
+    section = section.push(stats_table(app, guests.into_iter(), false));
+    section.into()
+}
+
+/// Players of the game being played (or the last one), with a Ban button each.
+/// The lobby is gone once a game starts, so this is the place to ban during or after a match.
+fn current_game(app: &App) -> Element<'_, Message> {
+    let Some(game) = app.last_game.as_ref().filter(|g| !g.players.is_empty()) else {
+        return space().height(0).into();
+    };
+    let title = if app.in_game { "In this game" } else { "Last game" };
+    let reason = effects::skin(
+        text_input("Ban reason (optional)", &app.ban_form_reason)
+            .on_input(Message::BanFormReason)
+            .padding([6, 12])
+            .size(14)
+            .style(p::input),
+        Frame::Input,
+    );
+    column![
+        row![
+            text(title).size(16).color(p::GOLD).width(Fill),
+            muted(&game.lobby)
+        ]
+        .align_y(Alignment::Center),
+        stats_table(app, game.players.iter().cloned(), true),
+        reason,
+        muted("Bans are saved to the ban list; banned players are removed when they join a later lobby."),
+    ]
+    .spacing(6)
+    .into()
+}
+
 /// Why players were removed, newest first. Fills the space under the hosting form.
 fn recent_kicks(app: &App) -> Element<'_, Message> {
     let mut list = column![text("Recent kicks").size(16).color(p::GOLD)].spacing(6);
@@ -384,4 +551,23 @@ fn ban_prompt<'a>(player: &'a str, reason: &'a str) -> Element<'a, Message> {
     ]
     .spacing(6)
     .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn player_rows_show_level_matches_and_filter_status() {
+        let found = Some(Some(DsStats { level: 14, matches: 230 }));
+        let low = Some(Some(DsStats { level: 3, matches: 12 }));
+        assert_eq!(player_row("A#1", found, 10, 0).2, "Passed");
+        assert_eq!(player_row("A#1", found, 0, 0).2, "Found");
+        assert_eq!(player_row("A#1", found, 0, 0).0, "14");
+        assert_eq!(player_row("A#1", found, 0, 0).1, "230");
+        assert_eq!(player_row("A#1", low, 10, 100).2, "Below minimum");
+        assert_eq!(player_row("A#1", Some(None), 10, 0).2, "Not on W3C");
+        assert_eq!(player_row("A#1", None, 10, 0).2, "Checking…");
+        assert_eq!(player_row("NoTag", None, 10, 0).2, "No BattleTag");
+    }
 }

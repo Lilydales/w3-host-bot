@@ -34,6 +34,8 @@ pub(super) struct DsCheck {
     /// Kick reason per queued player, for chat and the launcher.
     reasons: std::collections::BTreeMap<String, String>,
     last_sent: Option<u64>,
+    /// Answers for players still in the lobby, so a live filter change can re-check them.
+    verdicts: std::collections::BTreeMap<String, Lookup>,
 }
 
 impl Default for DsCheck {
@@ -48,6 +50,7 @@ impl Default for DsCheck {
             kicks: VecDeque::new(),
             reasons: Default::default(),
             last_sent: None,
+            verdicts: Default::default(),
         }
     }
 }
@@ -114,6 +117,7 @@ impl DsCheck {
         self.messages.retain(|(n, _)| n != name);
         self.kicks.retain(|(n, _)| n != name);
         self.reasons.remove(name);
+        self.verdicts.remove(name);
     }
 
     /// New lobby or game: forget everything, including answers still on their way.
@@ -124,6 +128,7 @@ impl DsCheck {
         self.kicks.clear();
         self.reasons.clear();
         self.last_sent = None;
+        self.verdicts.clear();
         while self.results.try_recv().is_ok() {}
     }
 
@@ -145,6 +150,7 @@ impl DsCheck {
                 continue;
             }
             let _ = events.send(Event::DsStats(name.clone(), result.stats()));
+            self.verdicts.insert(name.clone(), result);
             if ds_report::rejects(config.min_ds_level, config.min_ds_matches, result) {
                 let detail = match result.stats() {
                     Some(s) => format!("Lv. {} ({} matches)", s.level, s.matches),
@@ -163,6 +169,37 @@ impl DsCheck {
                 self.messages.push_back((name, text));
             }
         }
+    }
+
+    /// The filter minimums changed while hosting: queue anyone already checked who no
+    /// longer passes. Players who now pass are left alone (they were never removed).
+    pub fn refilter(&mut self, config: &Config, now: u64, events: &Sender<Event>) {
+        for (name, result) in &self.verdicts {
+            if self.kicks.iter().any(|(queued, _)| queued == name)
+                || !ds_report::rejects(config.min_ds_level, config.min_ds_matches, *result)
+            {
+                continue;
+            }
+            let _ = events.send(Event::Activity(Activity::Command(format!(
+                "DS filter changed · {name} no longer passes · removing"
+            ))));
+            self.reasons.insert(
+                name.clone(),
+                ds_report::reject_reason(config.min_ds_level, config.min_ds_matches, *result),
+            );
+            self.kicks.push_back((name.clone(), now));
+        }
+        // Players who now pass should not be kicked from an older, stricter queue.
+        let reasons = &mut self.reasons;
+        self.kicks.retain(|(name, _)| {
+            let keep = self.verdicts.get(name).is_none_or(|r| {
+                ds_report::rejects(config.min_ds_level, config.min_ds_matches, *r)
+            });
+            if !keep {
+                reasons.remove(name);
+            }
+            keep
+        });
     }
 
     /// The next stats line for a player who is still in the lobby, one per second.
@@ -315,5 +352,31 @@ mod tests {
         check.sender.send(("B#2".into(), Lookup::NotFound)).unwrap();
         check.reset();
         assert!(check.results.try_recv().is_err() && check.pending.is_empty());
+    }
+
+    #[test]
+    fn a_stricter_live_filter_queues_players_already_in_the_lobby() {
+        let mut check = DsCheck::default();
+        let (events, received) = mpsc::channel();
+        check.pending.insert("Low#1".into());
+        check.pending.insert("High#2".into());
+        check.sender.send(("Low#1".into(), Lookup::Found(ds_report::DsStats { level: 3, matches: 10 }))).unwrap();
+        check.sender.send(("High#2".into(), Lookup::Found(ds_report::DsStats { level: 30, matches: 500 }))).unwrap();
+        let mut announcements = Announcements::default();
+        check.poll(&Config::default(), 1, &events, &mut announcements);
+        assert!(check.kicks.is_empty(), "the filter is off at first");
+
+        let strict = Config { min_ds_level: 10, ..Config::default() };
+        check.refilter(&strict, 5, &events);
+        let queued: Vec<_> = check.kicks.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(queued, ["Low#1"]);
+        assert!(check.reasons["Low#1"].contains("level 3 is below 10"));
+        check.refilter(&strict, 6, &events);
+        assert_eq!(check.kicks.len(), 1, "never queued twice");
+
+        // Relaxing the filter again cancels the queued kick.
+        check.refilter(&Config::default(), 7, &events);
+        assert!(check.kicks.is_empty() && check.reasons.is_empty());
+        assert!(received.try_iter().count() >= 1);
     }
 }

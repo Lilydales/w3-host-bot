@@ -127,6 +127,8 @@ impl Profile {
             empty_refresh: self.empty_rehost_seconds,
             commands: self.commands.clone(),
             welcome: self.welcome.clone(),
+            min_ds_level: self.min_ds_level,
+            min_ds_matches: self.min_ds_matches,
         }
     }
 

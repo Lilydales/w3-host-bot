@@ -391,6 +391,8 @@ fn live_settings_change_the_current_lobby_without_recreating_it() {
             enabled: true,
             message: "Hello #{playername}".into(),
         },
+        min_ds_level: 7,
+        min_ds_matches: 40,
     };
     let commands = dispatch(
         &mut engine,
@@ -403,6 +405,8 @@ fn live_settings_change_the_current_lobby_without_recreating_it() {
     assert_eq!(engine.config.welcome, settings.welcome);
     assert!(!engine.config.restart_on_load);
     assert_eq!(engine.config.empty_rehost_seconds, 60);
+    assert_eq!(engine.config.min_ds_level, 7);
+    assert_eq!(engine.config.min_ds_matches, 40);
     let mut invalid = settings.clone();
     invalid.minimum = 0;
     invalid.welcome.message = "Should not apply".into();

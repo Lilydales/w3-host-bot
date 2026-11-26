@@ -10,6 +10,9 @@ pub struct LiveSettings {
     pub empty_refresh: u64,
     pub commands: CommandSettings,
     pub welcome: Welcome,
+    /// Direct Strike filter minimums (0 = off). Changing them re-checks the current lobby.
+    pub min_ds_level: u32,
+    pub min_ds_matches: u32,
 }
 
 impl LiveSettings {
@@ -17,6 +20,8 @@ impl LiveSettings {
         if !(1..=23).contains(&self.minimum)
             || !(5..=3600).contains(&self.rehost_delay)
             || self.empty_refresh > 86400
+            || self.min_ds_level > 100_000
+            || self.min_ds_matches > 1_000_000
         {
             return Err("Hosting settings are outside supported bounds.".into());
         }
@@ -30,6 +35,8 @@ impl LiveSettings {
         engine.config.empty_rehost_seconds = self.empty_refresh;
         engine.config.commands = self.commands.clone();
         engine.config.welcome = self.welcome.clone();
+        engine.config.min_ds_level = self.min_ds_level;
+        engine.config.min_ds_matches = self.min_ds_matches;
         Ok(())
     }
 }

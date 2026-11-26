@@ -116,7 +116,8 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
         muted(
             "Players with a BattleTag are looked up on ds-report.com when they join. \
              Players who are not found, or are below a minimum, are kicked (never banned). \
-             0 turns a minimum off. Applies when hosting starts."
+             0 turns a minimum off. The minimums apply immediately, also while hosting \
+             (they are on the Hosting page too); the patch version applies when hosting starts."
         ),
         super::widgets::field_enabled(
             "Patch version",
@@ -129,13 +130,13 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
                 "Minimum level (0 = off)",
                 &app.form.min_ds_level,
                 Field::DsLevel,
-                app.worker.is_none()
+                true
             ),
             super::widgets::field_enabled(
                 "Minimum matches (0 = off)",
                 &app.form.min_ds_matches,
                 Field::DsMatches,
-                app.worker.is_none()
+                true
             )
         ]
         .spacing(12),

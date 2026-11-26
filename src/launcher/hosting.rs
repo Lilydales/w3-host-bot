@@ -115,6 +115,7 @@ impl App {
                 }
                 Event::Lobby(lobby) => {
                     self.last_roster = (lobby.name.clone(), super::ban_list::guests(&lobby));
+                    self.in_game = false;
                     self.lobby = Some(lobby);
                 }
                 Event::LobbyCleared => self.lobby = None,
@@ -139,6 +140,7 @@ impl App {
                     self.preview.target(None);
                     self.worker = None;
                     self.lobby = None;
+                    self.in_game = false;
                     self.ds_stats.clear();
                     self.hosting_status = if result.is_ok() {
                         "Stopped"
@@ -182,7 +184,9 @@ impl App {
                 self.log_line(&format!("Lobby created · {name}"), true)
             }
             Activity::GameStarted(name) => {
-                self.ds_stats.clear();
+                self.in_game = true;
+                // Keep the levels of the players who are now in the game.
+                self.ds_stats.retain(|player, _| self.last_roster.1.contains(player));
                 // Remember who played so they can be banned after the match.
                 if self.last_roster.0 == name && !self.last_roster.1.is_empty() {
                     self.last_game = Some(super::ban_list::LastGame {

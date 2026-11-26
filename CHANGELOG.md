@@ -7,6 +7,25 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.7.0 — 2026-11-26
+
+### Added
+- **Live Direct Strike filter on the Hosting page.** Min level / min matches can be changed at any time, also while hosting; they are sent ~0.5 s after typing as part of `LiveSettings` (new fields `min_ds_level`, `min_ds_matches`). No restart needed.
+  - A stricter filter re-checks players already in the lobby (`DsCheck::refilter`) and kicks those who no longer pass, with the usual reason. Relaxing it cancels kicks still queued.
+  - Options page: the two minimum fields are no longer locked while hosting. Patch version still applies when hosting starts.
+- **Players section** (Hosting page): everyone in the lobby with DS level, matches and status (Passed / Found / Below minimum / Not on W3C / Checking… / No BattleTag).
+- **In this game / Last game section** (Hosting page): the players of the running game (lobby is gone once it starts) with level, matches and a **Ban** button each, plus an optional reason box. Bans go to `bans.json`; they take effect in later lobbies. The host is not listed.
+- Tests: `a_stricter_live_filter_queues_players_already_in_the_lobby`, `player_rows_show_level_matches_and_filter_status`, `ds_minimums_are_live_settings_and_game_players_stay_listed_with_levels`; `live_settings_change_the_current_lobby_without_recreating_it` also checks the DS minimums.
+
+### Changed
+- Lobby rows no longer show the `[Lv. … | …m]` badge (it wrapped over three lines beside long names).
+- Game start keeps the DS stats of the game's players instead of clearing them.
+- Version 0.6.0 → 0.7.0.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+- Supersedes the earlier 0.7.0 zip built from a text rendering; this one was made from the real 0.6.0 files.
+
 ## 0.6.0 — 2026-11-26
 
 ### Added

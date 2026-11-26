@@ -405,3 +405,24 @@ fn kicks_are_listed_newest_first_with_their_reason_and_logged() {
     assert!(app.recent_kicks[0].reason.contains("level 3"));
     assert!(app.logs.front().unwrap().message.starts_with("Kicked · P#9"));
 }
+
+#[test]
+fn ds_minimums_are_live_settings_and_game_players_stay_listed_with_levels() {
+    use ghost_reforged::{ds_report::DsStats, hosting::Activity};
+    let directory = tempfile::tempdir().unwrap();
+    let mut app = App::new(directory.path(), None);
+    app.form.profile.min_ds_level = 12;
+    app.form.profile.min_ds_matches = 80;
+    let live = app.form.profile.live_settings();
+    assert_eq!((live.min_ds_level, live.min_ds_matches), (12, 80));
+    assert!(live.validate().is_ok());
+
+    app.last_roster = ("DS #4".into(), vec!["Mate#1".into()]);
+    app.ds_stats.insert("Mate#1".into(), Some(DsStats { level: 20, matches: 300 }));
+    app.ds_stats.insert("Gone#2".into(), None);
+    app.record_activity(Activity::GameStarted("DS #4".into()));
+    assert!(app.in_game);
+    assert_eq!(app.last_game.as_ref().unwrap().players, vec!["Mate#1".to_string()]);
+    assert!(app.ds_stats.contains_key("Mate#1"), "levels of game players are kept");
+    assert!(!app.ds_stats.contains_key("Gone#2"));
+}
