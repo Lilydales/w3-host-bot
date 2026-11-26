@@ -124,6 +124,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
             start_rule
         ]
         .spacing(24),
+        recent_kicks(app),
     ]
     .spacing(12);
     let mut footer = column![controls].spacing(9);
@@ -276,12 +277,12 @@ fn lobby(app: &App) -> Element<'_, Message> {
             format!("0 / {capacity}"),
         )
     };
-    let observer_name = app
+    let own = app
         .lobby
         .as_ref()
-        .and_then(|l| l.slots.iter().find(|s| s.own))
-        .map(|s| s.name.as_str())
-        .unwrap_or("");
+        .and_then(|l| l.slots.iter().find(|s| s.own));
+    let observer_name = own.map(|s| s.name.as_str()).unwrap_or("");
+    let own_role = host_role(own, app.form.profile.player_host);
     let contents = column![
         row![
             text(name)
@@ -304,7 +305,7 @@ fn lobby(app: &App) -> Element<'_, Message> {
         row![
             art::ghost(30.0),
             text(observer_name).size(16).width(Fill),
-            muted("Observer")
+            muted(own_role)
         ]
         .spacing(12)
         .align_y(Alignment::Center),
@@ -334,6 +335,34 @@ fn lobby(app: &App) -> Element<'_, Message> {
         body = body.push(container(muted(&app.hosting_status)).padding([0, 24]));
     }
     effects::frame(container(body).height(Fill).style(p::panel))
+}
+
+/// How the host's own slot is labelled: the live lobby wins over the profile setting.
+fn host_role(own: Option<&ghost_reforged::hosting::Slot>, player_host: bool) -> String {
+    match own {
+        Some(slot) if slot.observer => "Observer".into(),
+        Some(slot) => format!("Host · slot {}", slot.number + 1),
+        None if player_host => "Host".into(),
+        None => "Observer".into(),
+    }
+}
+
+/// Why players were removed, newest first. Fills the space under the hosting form.
+fn recent_kicks(app: &App) -> Element<'_, Message> {
+    let mut list = column![text("Recent kicks").size(16).color(p::GOLD)].spacing(6);
+    if app.recent_kicks.is_empty() {
+        list = list.push(muted("Nobody has been kicked yet. Reasons appear here and in lobby chat."));
+    }
+    for entry in &app.recent_kicks {
+        list = list.push(
+            row![
+                muted(&entry.time).width(48),
+                column![text(&entry.name).size(14), muted(&entry.reason)].spacing(2)
+            ]
+            .spacing(8),
+        );
+    }
+    list.into()
 }
 
 /// Inline confirmation shown under a player's row after clicking "Ban".

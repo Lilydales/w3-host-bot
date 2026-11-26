@@ -162,6 +162,11 @@ pub(super) fn run(
                 identity_ok,
                 event.is_none(),
             ) {
+                if let Some((name, reason)) = manual_kick.take_kicked() {
+                    // Explain first; the kicked player may still see it before leaving.
+                    commands.push(kick::reason_chat(&name, &reason));
+                    let _ = tx.send(Event::Kicked(name, reason));
+                }
                 commands.extend(command);
                 if let Some(line) = line {
                     let _ = tx.send(Event::Activity(Activity::Command(line)));
@@ -179,7 +184,9 @@ pub(super) fn run(
                 let _ = tx.send(Event::Activity(Activity::Command(line)));
                 // Remove them now even if the list could not be saved. Also asks the
                 // game for a native ban; the list stays as the fallback.
-                manual_kick.request_ban(target.clone(), &engine, now);
+                if manual_kick.request_ban(target.clone(), &engine, now).is_some() {
+                    manual_kick.set_reason(kick::ban_reason(Some(reason.as_str())));
+                }
             }
             if now != ban_checked {
                 ban_checked = now;
@@ -195,6 +202,9 @@ pub(super) fn run(
                 && let Some(target) = ban_enforcer.next(lobby, &bans, now)
                 && manual_kick.request(target.clone(), &engine, now).is_some()
             {
+                manual_kick.set_reason(kick::ban_reason(
+                    bans.matching(target.name()).map(|entry| entry.reason.as_str()),
+                ));
                 let _ = tx.send(Event::Activity(Activity::Command(format!(
                     "Banned player removed · {}",
                     target.name()
@@ -241,8 +251,14 @@ pub(super) fn run(
                     kick::Refresh::Confirm => {
                         if let Some((target, _, _)) = kick_requested.take()
                             && let Some(lobby) = engine.owned_lobby(now)
+                            && let Some(command) = target.confirm(lobby)
                         {
-                            commands.extend(target.confirm(lobby));
+                            // The vote result is already announced in chat by the command.
+                            let _ = tx.send(Event::Kicked(
+                                target.name().to_owned(),
+                                "Vote kick passed".into(),
+                            ));
+                            commands.push(command);
                         }
                     }
                     kick::Refresh::Wait => {}

@@ -31,6 +31,8 @@ pub(super) struct DsCheck {
     seen: BTreeSet<String>,
     messages: VecDeque<(String, String)>,
     kicks: VecDeque<(String, u64)>,
+    /// Kick reason per queued player, for chat and the launcher.
+    reasons: std::collections::BTreeMap<String, String>,
     last_sent: Option<u64>,
 }
 
@@ -44,6 +46,7 @@ impl Default for DsCheck {
             seen: BTreeSet::new(),
             messages: VecDeque::new(),
             kicks: VecDeque::new(),
+            reasons: Default::default(),
             last_sent: None,
         }
     }
@@ -110,6 +113,7 @@ impl DsCheck {
         self.seen.remove(name);
         self.messages.retain(|(n, _)| n != name);
         self.kicks.retain(|(n, _)| n != name);
+        self.reasons.remove(name);
     }
 
     /// New lobby or game: forget everything, including answers still on their way.
@@ -118,6 +122,7 @@ impl DsCheck {
         self.seen.clear();
         self.messages.clear();
         self.kicks.clear();
+        self.reasons.clear();
         self.last_sent = None;
         while self.results.try_recv().is_ok() {}
     }
@@ -148,6 +153,10 @@ impl DsCheck {
                 let _ = events.send(Event::Activity(Activity::Command(format!(
                     "DS filter · {name} · {detail} · removing"
                 ))));
+                self.reasons.insert(
+                    name.clone(),
+                    ds_report::reject_reason(config.min_ds_level, config.min_ds_matches, result),
+                );
                 self.kicks.push_back((name, now));
             } else {
                 let text = announcement(&name, result);
@@ -202,6 +211,9 @@ impl DsCheck {
                 return false; // Not kickable yet; try again next tick.
             };
             if manual.request(target, engine, now).is_some() {
+                if let Some(reason) = self.reasons.remove(&name) {
+                    manual.set_reason(reason);
+                }
                 self.kicks.pop_front();
                 return true;
             }

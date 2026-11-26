@@ -381,3 +381,27 @@ fn manual_and_last_game_bans_are_saved_with_reason_and_remembered() {
     assert_eq!(list.get("typed#42").unwrap().reason, "spam");
     assert!(list.is_banned("Rude#5"));
 }
+
+#[test]
+fn zero_observer_slots_turn_observers_off_only_for_player_hosts() {
+    use ghost_reforged::config::Observers;
+    let off = super::hosting::map_settings(true, 0);
+    assert!(matches!(off.observers, Observers::None));
+    assert_eq!(off.observers.wire(), 0);
+    assert!(matches!(super::hosting::map_settings(true, 2).observers, Observers::Full));
+    // The observer-host mode sits in an observer slot itself, so it always keeps them.
+    assert!(matches!(super::hosting::map_settings(false, 0).observers, Observers::Full));
+}
+
+#[test]
+fn kicks_are_listed_newest_first_with_their_reason_and_logged() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut app = App::new(directory.path(), None);
+    for index in 0..10 {
+        app.record_kick(format!("P#{index}"), "Direct Strike filter: level 3 is below 10".into());
+    }
+    assert_eq!(app.recent_kicks.len(), 8);
+    assert_eq!(app.recent_kicks[0].name, "P#9");
+    assert!(app.recent_kicks[0].reason.contains("level 3"));
+    assert!(app.logs.front().unwrap().message.starts_with("Kicked · P#9"));
+}

@@ -112,6 +112,23 @@ pub fn rejects(min_level: u32, min_matches: u32, result: Lookup) -> bool {
     }
 }
 
+/// Why `rejects` removed a player, in words for lobby chat.
+pub fn reject_reason(min_level: u32, min_matches: u32, result: Lookup) -> String {
+    match result {
+        Lookup::Found(s) => {
+            let mut parts = Vec::new();
+            if min_level > 0 && s.level < min_level {
+                parts.push(format!("level {} is below {min_level}", s.level));
+            }
+            if min_matches > 0 && s.matches < min_matches {
+                parts.push(format!("{} matches is below {min_matches}", s.matches));
+            }
+            format!("Direct Strike filter: {}", parts.join(" and "))
+        }
+        _ => "Direct Strike filter: not found on W3Champions".into(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,6 +172,19 @@ mod tests {
         assert!(!rejects(0, 50, found(1, 50)));
         assert!(rejects(50, 50, found(60, 10)));
         assert!(!rejects(50, 50, found(60, 60)));
+    }
+
+    #[test]
+    fn reject_reasons_name_every_failed_minimum() {
+        assert_eq!(
+            reject_reason(10, 0, found(3, 99)),
+            "Direct Strike filter: level 3 is below 10"
+        );
+        assert_eq!(
+            reject_reason(10, 100, found(3, 40)),
+            "Direct Strike filter: level 3 is below 10 and 40 matches is below 100"
+        );
+        assert!(reject_reason(10, 0, Lookup::NotFound).contains("not found"));
     }
 
     #[test]

@@ -1,9 +1,23 @@
 use super::app::App;
 use ghost_reforged::{
-    config::{Config, HostMode},
+    config::{Config, HostMode, MapSettings, Observers},
     hosting::{Activity, Control, Event, Worker},
 };
 use std::time::{Duration, Instant};
+
+/// Player-host lobbies with 0 observer slots are created with observers off, so the
+/// game shows no observer team at all instead of a column of closed slots.
+/// The observer-host mode needs an observer slot for the bot, so it keeps "Full".
+pub(super) fn map_settings(player_host: bool, observer_slots: u8) -> MapSettings {
+    MapSettings {
+        observers: if player_host && observer_slots == 0 {
+            Observers::None
+        } else {
+            Observers::Full
+        },
+        ..MapSettings::default()
+    }
+}
 
 impl App {
     pub(super) fn start_hosting(&mut self) -> Result<(), String> {
@@ -42,6 +56,7 @@ impl App {
             restart_on_load: p.rehost && !p.player_host,
             private_game: p.private_game,
             max_games: if p.rehost { 0 } else { 1 },
+            map_settings: map_settings(p.player_host, p.observer_slots),
             ..Config::default()
         };
         self.worker = Some(Worker::start(config)?);
@@ -103,6 +118,7 @@ impl App {
                     self.lobby = Some(lobby);
                 }
                 Event::LobbyCleared => self.lobby = None,
+                Event::Kicked(name, reason) => self.record_kick(name, reason),
                 Event::DsStats(name, stats) => {
                     self.ds_stats.insert(name, stats);
                 }
@@ -146,6 +162,17 @@ impl App {
         if self.worker.is_some() {
             self.settings_due = Some(Instant::now() + Duration::from_millis(500));
         }
+    }
+
+    pub(super) fn record_kick(&mut self, name: String, reason: String) {
+        let seconds = self.started.elapsed().as_secs();
+        self.log(&format!("Kicked · {name} · {reason}"));
+        self.recent_kicks.push_front(super::app::KickEntry {
+            time: format!("{:02}:{:02}", seconds / 60, seconds % 60),
+            name,
+            reason,
+        });
+        self.recent_kicks.truncate(8);
     }
 
     pub(super) fn record_activity(&mut self, event: Activity) {

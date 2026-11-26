@@ -151,11 +151,28 @@ fn native_ban_enabled() -> bool {
 }
 
 #[derive(Default)]
-pub(super) struct PendingKick(Option<(KickRequest, u64, RefreshGate)>, bool);
+pub(super) struct PendingKick {
+    pending: Option<(KickRequest, u64, RefreshGate)>,
+    native_ban: bool,
+    /// Why the pending player is being removed; shown in lobby chat and the launcher.
+    reason: String,
+    /// Set when a kick command was just produced: (player, reason).
+    kicked: Option<(String, String)>,
+}
 
 impl PendingKick {
     pub fn idle(&self) -> bool {
-        self.0.is_none()
+        self.pending.is_none()
+    }
+
+    /// Replaces the reason for the request just made with `request` / `request_ban`.
+    pub fn set_reason(&mut self, reason: impl Into<String>) {
+        self.reason = reason.into();
+    }
+
+    /// The player and reason of a kick that was just sent, once.
+    pub fn take_kicked(&mut self) -> Option<(String, String)> {
+        self.kicked.take()
     }
 
     pub fn request(&mut self, target: KickRequest, engine: &Engine, now: u64) -> Option<()> {
@@ -164,8 +181,9 @@ impl PendingKick {
         {
             return None;
         }
-        self.0 = Some((target, now, RefreshGate::default()));
-        self.1 = false;
+        self.pending = Some((target, now, RefreshGate::default()));
+        self.native_ban = false;
+        self.reason = "Kicked by the host".into();
         Some(())
     }
 
@@ -174,7 +192,7 @@ impl PendingKick {
     /// ban the enforcer still removes the player.
     pub fn request_ban(&mut self, target: KickRequest, engine: &Engine, now: u64) -> Option<()> {
         self.request(target, engine, now)?;
-        self.1 = native_ban_enabled();
+        self.native_ban = native_ban_enabled();
         Some(())
     }
 
@@ -186,13 +204,13 @@ impl PendingKick {
         alias_ready: bool,
         input_idle: bool,
     ) -> Option<(Option<Command>, Option<String>)> {
-        let (target, requested, gate) = self.0.as_mut()?;
+        let (target, requested, gate) = self.pending.as_mut()?;
         if now.saturating_sub(*requested) >= 5
             || engine.phase != Phase::Lobby
             || !engine.owned_lobby(now).is_some_and(|l| target.matches(l))
         {
             let name = target.name.clone();
-            self.0 = None;
+            self.pending = None;
             return Some((None, Some(format!("Kick cancelled · {name}"))));
         }
         match gate.advance(fresh_roster, input_idle, alias_ready) {
@@ -200,21 +218,42 @@ impl PendingKick {
             Refresh::Request => return Some((Some(Command::empty("SendGameLobbySetup")), None)),
             Refresh::Confirm => {}
         }
-        let (target, _, _) = self.0.take()?;
-        let native_ban = std::mem::take(&mut self.1);
+        let (target, _, _) = self.pending.take()?;
+        let native_ban = std::mem::take(&mut self.native_ban);
         if engine.owned_lobby(now).is_some_and(|l| target.matches(l)) {
             let (message, line) = if native_ban {
                 ("BanPlayerFromGameLobby", "Native ban requested")
             } else {
                 ("KickPlayerFromGameLobby", "Kick requested")
             };
+            self.kicked = Some((target.name.clone(), std::mem::take(&mut self.reason)));
             Some((
                 Some(Command::new(message, json!({"slot":target.slot}))),
-                Some(format!("{line} · {}", target.name)),
+                Some(format!("{line} · {} · {}", target.name, self.kicked.as_ref().map_or("", |k| k.1.as_str()))),
             ))
         } else {
             Some((None, Some(format!("Kick cancelled · {}", target.name))))
         }
+    }
+}
+
+/// The lobby chat line sent just before a kick.
+pub(super) fn reason_chat(name: &str, reason: &str) -> Command {
+    let text: String = format!("Removing {name}: {reason}")
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(200)
+        .collect();
+    // A leading slash would run a native chat command.
+    let text = if text.starts_with('/') { format!(" {text}") } else { text };
+    Command::new("SendGameChatMessage", json!({"content": text}))
+}
+
+/// "Banned: <reason>", or a generic line when no reason was given.
+pub(super) fn ban_reason(reason: Option<&str>) -> String {
+    match reason.map(str::trim).filter(|r| !r.is_empty()) {
+        Some(reason) => format!("Banned: {reason}"),
+        None => "On the ban list".into(),
     }
 }
 

@@ -156,6 +156,13 @@ impl Form {
     }
 }
 
+/// One removed player, shown under "Recent kicks" on the Hosting page.
+pub struct KickEntry {
+    pub time: String,
+    pub name: String,
+    pub reason: String,
+}
+
 pub struct LogEntry {
     pub time: String,
     pub message: String,
@@ -199,6 +206,8 @@ pub struct App {
     /// Names banned from this launcher session (lowercase), to disable repeat buttons.
     pub(super) recent_bans: std::collections::HashSet<String>,
     pub(super) ban_file: PathBuf,
+    /// Newest first, at most 8, kept for the launcher session.
+    pub recent_kicks: VecDeque<KickEntry>,
     pub hosting_status: String,
     pub(super) closing: Option<iced::window::Id>,
     probing: bool,
@@ -250,6 +259,7 @@ impl App {
             last_game: None,
             recent_bans: Default::default(),
             ban_file: Self::locate_ban_file(directory),
+            recent_kicks: VecDeque::new(),
             hosting_status: "Idle".into(),
             closing: None,
             probing: false,

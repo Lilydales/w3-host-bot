@@ -116,3 +116,13 @@ fn a_ban_without_a_reason_still_removes_the_player() {
     assert!(list.get("Quiet#2").unwrap().reason.is_empty());
     assert!(BanEnforcer::default().next(&room, &list, 1).is_some());
 }
+
+#[test]
+fn kick_reasons_are_readable_in_chat_and_never_start_a_command() {
+    assert_eq!(ban_reason(Some("  spam ")), "Banned: spam");
+    assert_eq!(ban_reason(Some("")), "On the ban list");
+    assert_eq!(ban_reason(None), "On the ban list");
+    let line = reason_chat("/x#1", "Banned: a\nb");
+    assert_eq!(line.message, "SendGameChatMessage");
+    assert_eq!(line.payload["content"], " Removing /x#1: Banned: ab");
+}

@@ -105,7 +105,15 @@ fn a_manual_kick_requires_a_fresh_matching_player_and_is_sent_only_once() {
     let command = command.unwrap();
     assert_eq!(command.message, "KickPlayerFromGameLobby");
     assert_eq!(command.payload, json!({"slot":1}));
-    assert_eq!(activity.as_deref(), Some("Kick requested · Player"));
+    assert_eq!(
+        activity.as_deref(),
+        Some("Kick requested · Player · Kicked by the host")
+    );
+    assert_eq!(
+        pending.take_kicked(),
+        Some(("Player".into(), "Kicked by the host".into()))
+    );
+    assert!(pending.take_kicked().is_none());
     assert!(pending.confirm(&engine, 3, true, true, true).is_none());
 }
 

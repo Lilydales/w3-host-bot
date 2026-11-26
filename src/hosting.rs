@@ -93,6 +93,8 @@ pub enum Event {
     LobbyCleared,
     /// Direct Strike lookup result for a player; `None` means not on W3Champions.
     DsStats(String, Option<crate::ds_report::DsStats>),
+    /// A player was removed from the lobby: (player, reason).
+    Kicked(String, String),
     Reserve(u32),
     Finished(Result<(), String>),
 }

@@ -44,6 +44,10 @@ pub struct KickTarget {
 }
 
 impl KickTarget {
+    pub fn name(&self) -> &str {
+        &self.player.name
+    }
+
     pub fn confirm(&self, lobby: &Lobby) -> Option<Command> {
         (lobby.is_host
             && lobby.lobby_name == self.lobby

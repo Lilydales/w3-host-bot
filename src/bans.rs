@@ -209,6 +209,14 @@ impl BanList {
         self.entries.get(&name.trim().to_lowercase())
     }
 
+    /// The entry that bans this player: the exact BattleTag first, then the bare name.
+    pub fn matching(&self, name: &str) -> Option<&BanEntry> {
+        let name = name.trim().to_lowercase();
+        self.entries
+            .get(&name)
+            .or_else(|| self.entries.get(short(&name)))
+    }
+
     pub fn is_banned(&self, name: &str) -> bool {
         let name = name.trim().to_lowercase();
         !name.is_empty() && (self.entries.contains_key(&name) || self.entries.contains_key(short(&name)))
