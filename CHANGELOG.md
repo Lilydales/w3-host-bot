@@ -7,6 +7,13 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.17.1 - 2026-11-27
+
+### Changed
+- Version bumps committed to `main` can now create their Windows release automatically. Commit the workflow and all four Cargo version files together. The Windows workflow checks both manifests, runs locked tests, and builds the EXE and installer before pushing a new `vMAJOR.MINOR.PATCH` tag for the exact built commit and publishing the assets.
+- Existing tags are not moved or republished by the automatic build. Manually pushed `v*` tags still use the tag build. A manual run on a branch builds artifacts without publishing; if the automatic run pushed a tag but failed to publish the release, run the workflow manually on that tag to attach the assets.
+- Bumped the bot and Windows installer to 0.17.1. No hosting or updater behavior changed.
+
 ## 0.17.0 — 2026-11-26
 
 ### Added
