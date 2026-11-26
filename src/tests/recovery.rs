@@ -83,18 +83,30 @@ fn full_uses_map_capacity_without_an_unrelated_minimum() {
 }
 
 #[test]
-fn results_are_closed_at_startup_and_after_a_missed_start_event() {
-    for mut engine in [Engine::new(config()), armed()] {
-        let commands =
-            engine.on_event(&event("SetGlueScreen", json!({"screen":"SCORE_SCREEN"})), 1);
-        assert!(commands.iter().any(|c| c.message == "ScoreScreenClose"));
-        assert!(
-            commands
-                .iter()
-                .any(|c| c.message == "InitializeNetProvider")
-        );
-        assert!(!commands.iter().any(|c| c.message == "LeaveGame"));
-    }
+fn results_at_startup_close_without_waiting_or_leaving_game() {
+    let mut engine = Engine::new(config());
+    let score = event("SetGlueScreen", json!({"screen":"SCORE_SCREEN"}));
+    let commands = engine.on_event(&score, 1);
+    assert_eq!(
+        commands.iter().map(|command| command.message).collect::<Vec<_>>(),
+        ["ScoreScreenClose", "InitializeNetProvider"],
+    );
+}
+
+#[test]
+fn owned_results_after_a_missed_start_respect_the_rehost_delay() {
+    let mut engine = armed();
+    let score = event("SetGlueScreen", json!({"screen":"SCORE_SCREEN"}));
+    let now = 1;
+    let until = now + engine.config.rehost_delay_seconds;
+    assert!(engine.on_event(&score, now).is_empty());
+    assert_eq!(engine.phase, Phase::Cooldown(until));
+    assert!(engine.tick(until - 1).is_empty());
+    let commands = engine.tick(until);
+    assert_eq!(
+        commands.iter().map(|command| command.message).collect::<Vec<_>>(),
+        ["ScoreScreenClose", "InitializeNetProvider"],
+    );
 }
 
 #[test]

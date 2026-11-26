@@ -124,5 +124,5 @@ fn kick_reasons_are_readable_in_chat_and_never_start_a_command() {
     assert_eq!(ban_reason(None), "On the ban list");
     let line = reason_chat("/x#1", "Banned: a\nb");
     assert_eq!(line.message, "SendGameChatMessage");
-    assert_eq!(line.payload["content"], " Removing /x#1: Banned: ab");
+    assert_eq!(line.payload["content"], "Removing /x#1: Banned: ab");
 }

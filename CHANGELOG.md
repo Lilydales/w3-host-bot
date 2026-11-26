@@ -7,6 +7,13 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.17.2 - 2026-11-27
+
+### Fixed
+- Windows release CI filters only the native mute integration proof, which requires an active playback endpoint. Its failure while holding the presentation mutex also caused the window tests to fail with a poisoned lock. Window tests remain part of the CI release gate. The audio test remains available on a Windows machine with an active audio endpoint.
+- Updated two stale assertions: removal chat is already prefixed by `Removing`, and results for an owned player-host lobby close after the configured rehost delay, unlike results encountered at startup. No bot runtime changes.
+- Bumped the bot and Windows installer to 0.17.2. The Windows suite was not run in the editing environment.
+
 ## 0.17.1 - 2026-11-27
 
 ### Changed
