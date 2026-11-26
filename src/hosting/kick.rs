@@ -145,8 +145,13 @@ impl BanEnforcer {
     }
 }
 
+/// Native Warcraft III ban is on by default; set `W3_NATIVE_BAN=0` to send a plain kick.
+fn native_ban_enabled() -> bool {
+    std::env::var("W3_NATIVE_BAN").map_or(true, |v| v != "0")
+}
+
 #[derive(Default)]
-pub(super) struct PendingKick(Option<(KickRequest, u64, RefreshGate)>);
+pub(super) struct PendingKick(Option<(KickRequest, u64, RefreshGate)>, bool);
 
 impl PendingKick {
     pub fn idle(&self) -> bool {
@@ -160,6 +165,16 @@ impl PendingKick {
             return None;
         }
         self.0 = Some((target, now, RefreshGate::default()));
+        self.1 = false;
+        Some(())
+    }
+
+    /// Like `request`, but sends Warcraft III's native ban instead of a plain kick.
+    /// The ban list entry is saved separately, so if the game ignores the native
+    /// ban the enforcer still removes the player.
+    pub fn request_ban(&mut self, target: KickRequest, engine: &Engine, now: u64) -> Option<()> {
+        self.request(target, engine, now)?;
+        self.1 = native_ban_enabled();
         Some(())
     }
 
@@ -186,13 +201,16 @@ impl PendingKick {
             Refresh::Confirm => {}
         }
         let (target, _, _) = self.0.take()?;
+        let native_ban = std::mem::take(&mut self.1);
         if engine.owned_lobby(now).is_some_and(|l| target.matches(l)) {
+            let (message, line) = if native_ban {
+                ("BanPlayerFromGameLobby", "Native ban requested")
+            } else {
+                ("KickPlayerFromGameLobby", "Kick requested")
+            };
             Some((
-                Some(Command::new(
-                    "KickPlayerFromGameLobby",
-                    json!({"slot":target.slot}),
-                )),
-                Some(format!("Kick requested · {}", target.name)),
+                Some(Command::new(message, json!({"slot":target.slot}))),
+                Some(format!("{line} · {}", target.name)),
             ))
         } else {
             Some((None, Some(format!("Kick cancelled · {}", target.name))))
