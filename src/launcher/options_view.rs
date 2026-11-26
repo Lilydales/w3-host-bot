@@ -145,6 +145,8 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
             "The bot leaves each started game and creates the next lobby after this delay."
         }),
         rule::horizontal(1),
+        early_leavers(app),
+        rule::horizontal(1),
         text("Direct Strike filter").size(20),
         muted(
             "Players with a BattleTag are looked up on ds-report.com when they join. \
@@ -231,5 +233,41 @@ fn delay_stepper<'a>(seconds: u64) -> Element<'a, Message> {
     ]
     .spacing(9)
     .align_y(Alignment::Center)
+    .into()
+}
+
+/// Play as host: the replay folder and which early leavers are banned automatically.
+fn early_leavers(app: &App) -> Element<'_, Message> {
+    let current = app.form.profile.early_leave_rule;
+    let mut rules = row![].spacing(9).align_y(Alignment::Center);
+    for rule in super::profile::EarlyLeaveRule::ALL {
+        rules = rules.push(super::widgets::action(
+            rule.label(),
+            Message::EarlyLeaveRule(rule),
+            rule != current,
+        ));
+    }
+    column![
+        text("Early leavers").size(20),
+        muted(
+            "After each match you play as host, the bot reads LastReplay.w3g to see who left \
+             and when. Players banned this way get the reason \"Left the game early (m:ss)\" \
+             and the native ban when they join a later lobby. The disabled button is the current rule."
+        ),
+        rules,
+        muted(format!("Ban automatically: {}", current.label())),
+        row![
+            muted(format!("Replay folder: {}", app.replay_folder_label())).width(Fill),
+            super::widgets::action("Choose folder", Message::PickReplayFolder, true),
+            super::widgets::action(
+                "Find automatically",
+                Message::AutoReplayFolder,
+                app.replay_folder.is_some()
+            ),
+        ]
+        .spacing(9)
+        .align_y(Alignment::Center),
+    ]
+    .spacing(10)
     .into()
 }

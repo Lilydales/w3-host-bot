@@ -7,6 +7,28 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.16.0 — 2026-11-26
+
+### Added
+- **Early leavers from the replay.** After each Play-as-host match the launcher reads `LastReplay.w3g` (`src/replay.rs`, new) and lists who left and when. Checked against a real W3C replay: players, match length (28:01) and the one early leave (23:56) all read correctly; observers (FLO) are skipped; players recorded leaving within 3 s of the end left with everyone and do not count.
+  - Parser: 28-byte header, zlib blocks inflated without a stream end (each block is flushed, not finished), player records, 0x39 metadata, slot table (observers = team 24), leave records (0x17) and time slots (0x1E/0x1F). Unknown blocks stop the scan without failing. Dependency: `flate2` (already in Cargo.lock; added to `ghost-reforged`'s list).
+- **Automatic early-leave bans** (Options → Early leavers): *Before 7 min* (default), *Any early leave*, or *Off (list only)*. Reason saved: `Left the game early (m:ss)`. Never the host, never a name without a BattleTag. Banned players get the native ban when they join a later lobby (0.10.0).
+- **Last game card:** match length from the replay; each early leaver with time and "before the end", marked *Banned automatically* or with a **Ban** button. The old manual "Left early" buttons remain only when no replay could be read.
+- **Replay folder:** found automatically (newest `Documents/Warcraft III/BattleNet/<n>/Replay/LastReplay.w3g`, also `Documents/Warcraft III/Replay`). If not found, the Last game card shows **Choose Replay folder** / **Find automatically**; the same controls are in Options. The choice is saved in `replay-folder.txt` in the data folder. Folder picker: `ghost_pick_folder` in `src/native/map_dialog.cpp`.
+- The replay must be newer than the match start (wall clock), so an old replay is never used; the launcher waits up to ~22 s for it.
+- **NEXT.md**: list of ideas and open items not done yet.
+- Tests: `players_leaves_and_length_are_read_and_observers_skipped`, `other_files_are_rejected_and_a_cut_replay_keeps_what_was_read`, `the_rule_picks_who_to_ban_and_never_the_host_or_end_of_match_leavers`, `reading_a_replay_bans_by_rule_and_a_missing_one_asks_for_the_folder`, `the_chosen_folder_is_saved_and_cleared`.
+
+### Changed
+- Profile field `early_leave_rule` (default *Before 7 min*; old profiles load unchanged).
+- `maps::documents_directory` is shared with the replay module.
+- Version 0.15.0 → 0.16.0.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+- The parser logic was run (as a Python mirror) against one real replay only; the Rust tests use a synthetic replay in the same layout.
+- The folder picker C++ was not compiled here.
+
 ## 0.15.0 — 2026-11-26
 
 ### Changed (Hosting page redesign, step 2)

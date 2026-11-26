@@ -10,6 +10,7 @@ pub mod hosting;
 pub mod protocol;
 pub mod protocol_log;
 pub mod recovery;
+pub mod replay;
 pub mod stats;
 pub mod transport;
 pub mod welcome;

@@ -832,14 +832,89 @@ fn current_game(app: &App) -> Element<'_, Message> {
         .align_y(Alignment::Center),
     ]
     .spacing(6);
-    if let Some(seconds) = game.ended_early {
+    if let Some(summary) = &game.replay {
+        section = section.push(replay_leavers(app, game, summary));
+    } else if let Some(seconds) = game.ended_early {
         section = section.push(early_leavers(app, game, seconds));
+    }
+    if app.replay_missing && game.replay.is_none() {
+        section = section.push(replay_folder_prompt());
     }
     section
         .push(stats_table(app, game.players.iter().cloned(), true))
         .push(reason)
         .push(muted("Bans are saved to the ban list; banned players are removed with a native ban when they join a later lobby."))
         .into()
+}
+
+/// Early leavers read from the match replay, with what the ban rule did about them.
+fn replay_leavers<'a>(
+    app: &App,
+    game: &'a super::ban_list::LastGame,
+    summary: &'a ghost_reforged::replay::Summary,
+) -> Element<'a, Message> {
+    use ghost_reforged::replay::clock;
+    let leavers = summary.early_leavers(super::replays::END_GRACE_MS);
+    let own = app.own_name.as_deref();
+    let mut list = column![muted(format!(
+        "Match length {} · from the replay",
+        clock(summary.length_ms)
+    ))]
+    .spacing(6);
+    if leavers.is_empty() {
+        list = list.push(muted("Nobody left early."));
+    }
+    for leave in leavers {
+        let you = own.is_some_and(|own| own.eq_ignore_ascii_case(&leave.name));
+        let before_end = clock(summary.length_ms.saturating_sub(leave.at_ms));
+        let mut line = row![
+            text(format!("{} left at {} ({before_end} before the end)", leave.name, clock(leave.at_ms)))
+                .size(14)
+                .color(if leave.at_ms < super::ban_list::EARLY_END_SECONDS * 1000 {
+                    p::ERROR
+                } else {
+                    p::TEXT
+                })
+                .width(Fill)
+        ]
+        .spacing(8)
+        .align_y(Alignment::Center);
+        if you {
+            line = line.push(muted("You"));
+        } else if game.auto_banned.iter().any(|name| name == &leave.name) {
+            line = line.push(text("Banned automatically").size(13).color(p::GOLD));
+        } else {
+            let banned = app.is_recently_banned(&leave.name);
+            line = line.push(action(
+                if banned { "Banned" } else { "Ban" },
+                Message::BanEarlyLeaver(leave.name.clone()),
+                !banned,
+            ));
+        }
+        list = list.push(line);
+    }
+    container(list).padding(10).style(p::panel).into()
+}
+
+/// Shown when the replay of the last match could not be found.
+fn replay_folder_prompt<'a>() -> Element<'a, Message> {
+    container(
+        column![
+            text("LastReplay.w3g was not found, so early leavers could not be detected.")
+                .size(14)
+                .color(p::GOLD),
+            muted("Usually Documents\\Warcraft III\\BattleNet\\<number>\\Replay."),
+            row![
+                action("Choose Replay folder", Message::PickReplayFolder, true),
+                action("Find automatically", Message::AutoReplayFolder, true),
+            ]
+            .spacing(9),
+        ]
+        .spacing(6),
+    )
+    .padding(10)
+    .style(p::panel)
+    .into()
 }
 
 /// After an early end: who left cannot be read from the game, so the host picks them.

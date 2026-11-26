@@ -23,6 +23,7 @@ mod preview;
 mod preview_view;
 mod process;
 mod profile;
+mod replays;
 mod select;
 mod storage;
 #[cfg(test)]

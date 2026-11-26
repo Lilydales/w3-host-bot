@@ -95,7 +95,7 @@ fn validate_in(path: &Path, maps: &Path) -> Result<PathBuf, String> {
 }
 
 #[cfg(windows)]
-fn documents_directory() -> Option<PathBuf> {
+pub(super) fn documents_directory() -> Option<PathBuf> {
     use windows_sys::Win32::{
         System::Com::CoTaskMemFree,
         UI::Shell::{FOLDERID_Documents, SHGetKnownFolderPath},
@@ -120,7 +120,7 @@ fn documents_directory() -> Option<PathBuf> {
 }
 
 #[cfg(not(windows))]
-fn documents_directory() -> Option<PathBuf> {
+pub(super) fn documents_directory() -> Option<PathBuf> {
     None
 }
 

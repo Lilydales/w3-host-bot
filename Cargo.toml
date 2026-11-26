@@ -1,6 +1,6 @@
 [package]
 name = "ghost-reforged"
-version = "0.15.0"
+version = "0.16.0"
 edition = "2024"
 license = "Apache-2.0"
 description = "GHost Reforged — configurable Warcraft III auto host"
@@ -28,6 +28,7 @@ tungstenite = { version = "0.28", default-features = false, features = ["handsha
 iced = { version = "0.14", default-features = false, features = ["tiny-skia", "tokio", "crisp", "svg", "image-without-codecs", "advanced"], optional = true }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"], optional = true }
 fs2 = "0.4"
+flate2 = "1"
 tempfile = "3"
 ureq = { version = "2.12", default-features = false, features = ["tls"] }
 

@@ -98,6 +98,7 @@ impl App {
     }
 
     pub(super) fn poll_host(&mut self) {
+        self.poll_replay();
         if self.settings_due.is_some_and(|due| Instant::now() >= due) {
             self.settings_due = None;
             self.apply_settings();
@@ -192,6 +193,7 @@ impl App {
     /// someone left early; the launcher then offers one-click "left early" bans.
     pub(super) fn match_ended(&mut self) {
         self.in_game = false;
+        self.read_replay();
         let Some(started) = self.game_started_at.take() else {
             return;
         };
@@ -232,6 +234,8 @@ impl App {
             Activity::GameStarted(name) => {
                 self.in_game = true;
                 self.game_started_at = Some(Instant::now());
+                self.game_started_wall = Some(std::time::SystemTime::now());
+                self.replay_missing = false;
                 // Keep the levels of the players who are now in the game.
                 let own = self.own_name.clone();
                 self.ds_stats.retain(|player, _| {
@@ -242,7 +246,7 @@ impl App {
                     self.last_game = Some(super::ban_list::LastGame {
                         lobby: name.clone(),
                         players: self.last_roster.1.clone(),
-                        ended_early: None,
+                        ..Default::default()
                     });
                 }
                 self.log_line(&format!("Game started · {name}"), true)

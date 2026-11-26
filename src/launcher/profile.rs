@@ -57,6 +57,34 @@ pub struct Profile {
     /// switching modes never inherits the other mode's choice. On by default.
     #[serde(default = "private_by_default")]
     pub player_rehost: bool,
+    /// Play as host: who is banned automatically when the replay shows they left early.
+    #[serde(default)]
+    pub early_leave_rule: EarlyLeaveRule,
+}
+
+/// Which early leavers (read from the match replay) are banned automatically.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EarlyLeaveRule {
+    /// Left before 7 minutes, which ends a Direct Strike match.
+    #[default]
+    BeforeSevenMinutes,
+    /// Left at any time before the match ended.
+    AnyEarlyLeave,
+    /// Only list them; ban by hand.
+    Off,
+}
+
+impl EarlyLeaveRule {
+    pub const ALL: [Self; 3] = [Self::BeforeSevenMinutes, Self::AnyEarlyLeave, Self::Off];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::BeforeSevenMinutes => "Before 7 min",
+            Self::AnyEarlyLeave => "Any early leave",
+            Self::Off => "Off (list only)",
+        }
+    }
 }
 
 fn auto_quit_delay() -> u64 {
@@ -134,6 +162,7 @@ impl Default for Profile {
             auto_quit_delay_seconds: auto_quit_delay(),
             leave_if_quit_fails: false,
             player_rehost: true,
+            early_leave_rule: EarlyLeaveRule::default(),
         }
     }
 }

@@ -88,6 +88,12 @@ pub enum Message {
     ToggleKicks,
     /// Show or hide the Game View panel under the lobby.
     TogglePreview,
+    /// Choose the Warcraft III replay folder.
+    PickReplayFolder,
+    ReplayFolderPicked(Result<Option<PathBuf>, String>),
+    /// Forget the chosen replay folder and find it automatically.
+    AutoReplayFolder,
+    EarlyLeaveRule(super::profile::EarlyLeaveRule),
     PollHost,
     CloseRequested(iced::window::Id),
     Browse,
@@ -234,6 +240,15 @@ pub struct App {
     pub(super) game_started_at: Option<Instant>,
     /// The host's own BattleTag in player mode, shown first in the player lists.
     pub own_name: Option<String>,
+    /// Wall-clock start of the current match, to tell its replay from an older one.
+    pub(super) game_started_wall: Option<std::time::SystemTime>,
+    /// Chosen replay folder; `None` finds it automatically.
+    pub replay_folder: Option<PathBuf>,
+    /// The last match's replay could not be found; the Hosting page asks for the folder.
+    pub replay_missing: bool,
+    pub(super) replay_job: Option<
+        std::sync::mpsc::Receiver<Result<ghost_reforged::replay::Summary, super::replays::ReplayError>>,
+    >,
     pub hosting_status: String,
     pub(super) closing: Option<iced::window::Id>,
     probing: bool,
@@ -293,6 +308,10 @@ impl App {
             show_preview: false,
             game_started_at: None,
             own_name: None,
+            game_started_wall: None,
+            replay_folder: super::replays::load_folder(directory),
+            replay_missing: false,
+            replay_job: None,
             hosting_status: "Idle".into(),
             closing: None,
             probing: false,
@@ -357,6 +376,9 @@ impl App {
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         if let Some(task) = self.update_message(&message) {
+            return task;
+        }
+        if let Some(task) = self.replay_message(&message) {
             return task;
         }
         if let Message::Tray(event) = message {
@@ -711,6 +733,7 @@ impl App {
             if self.worker.is_some()
                 || (!self.hidden && self.preview.needs_poll())
                 || self.settings_due.is_some()
+                || self.replay_job.is_some()
             {
                 iced::time::every(Duration::from_millis(250)).map(|_| Message::PollHost)
             } else {

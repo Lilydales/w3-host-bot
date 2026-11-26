@@ -26,6 +26,10 @@ pub struct LastGame {
     /// Set when the match ended before `EARLY_END_SECONDS` (Direct Strike ends the game
     /// when someone leaves before 7 minutes). Holds the match length in seconds.
     pub ended_early: Option<u64>,
+    /// What the match replay showed, once it has been read.
+    pub replay: Option<ghost_reforged::replay::Summary>,
+    /// Players banned automatically from the replay.
+    pub auto_banned: Vec<String>,
 }
 
 /// Direct Strike ends a match early when a player leaves within its first 7 minutes.
