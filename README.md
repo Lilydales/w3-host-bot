@@ -34,6 +34,10 @@ This fork of [shideneyu/ghost-reforged](https://github.com/shideneyu/ghost-refor
 
 ## Temporary diagnostics: W3 protocol logging
 
-Investigation only. Every text frame exchanged with Warcraft III's local UI WebSocket is printed to the console and appended to `w3-protocol.log` (current working directory; override with `W3_PROTOCOL_LOG_PATH`). RECV frames are logged before deserialization, SEND frames are the exact serialized frame. Keys containing password/token/cookie/secret/authorization/ticket are redacted. Native Warcraft III Ban support is **not** implemented.
+Investigation only. Every text frame exchanged with Warcraft III's local UI WebSocket is printed to the console and appended to `w3-protocol.log` (current working directory; override with `W3_PROTOCOL_LOG_PATH`). RECV frames are logged before deserialization, SEND frames are the exact serialized frame. Keys containing password/token/cookie/secret/authorization/ticket are redacted. 
 
 Disable: set `W3_PROTOCOL_LOG=0`. Remove: delete `src/protocol_log.rs`, the `pub mod protocol_log;` line in `src/lib.rs`, and the four `protocol_log::` calls in `src/transport.rs` (marked `TEMP`).
+
+## Native ban (experimental, v0.4.2)
+
+`Warcraft_III.exe` lists a `BanPlayerFromGameLobby` command beside `KickPlayerFromGameLobby`. The **Ban** button now saves the player to `ban.txt` as before, then sends `BanPlayerFromGameLobby` with `{"slot": N}` instead of a plain kick. The payload is a guess based on Kick and is not verified. If the game ignores it, the player stays in the lobby and the existing ban-list enforcement removes them within seconds, so nothing is lost. Check `w3-protocol.log` for how the game replied. Set `W3_NATIVE_BAN=0` to send a plain kick again. Manual **Kick** and vote-kick are unchanged.
