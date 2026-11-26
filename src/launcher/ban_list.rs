@@ -23,6 +23,18 @@ use std::path::PathBuf;
 pub struct LastGame {
     pub lobby: String,
     pub players: Vec<String>,
+    /// Set when the match ended before `EARLY_END_SECONDS` (Direct Strike ends the game
+    /// when someone leaves before 7 minutes). Holds the match length in seconds.
+    pub ended_early: Option<u64>,
+}
+
+/// Direct Strike ends a match early when a player leaves within its first 7 minutes.
+pub const EARLY_END_SECONDS: u64 = 7 * 60;
+pub const EARLY_LEAVE_REASON: &str = "Left the game early";
+
+/// Whether a match of this length counts as ended by an early leaver.
+pub fn ended_early(seconds: u64) -> bool {
+    seconds < EARLY_END_SECONDS
 }
 
 /// Human guests in a lobby snapshot, excluding the host, computers and unresolved names.
@@ -60,11 +72,18 @@ impl App {
 
     /// Adds a name to the ban list file. Returns a message for the notice line.
     pub(super) fn ban_name(&mut self, name: &str) -> Result<(), String> {
+        let reason = self.ban_form_reason.trim().to_owned();
+        self.ban_name_with(name, &reason)
+    }
+
+    /// Saves the ban locally (`bans.json`). If the player joins a later lobby, the host
+    /// removes them with Warcraft III's native ban.
+    pub(super) fn ban_name_with(&mut self, name: &str, reason: &str) -> Result<(), String> {
         let name = name.trim().to_owned();
         if name.is_empty() {
             return Err("Type a BattleTag to ban, for example Name#1234.".into());
         }
-        let reason = self.ban_form_reason.trim().to_owned();
+        let reason = reason.trim().to_owned();
         let mut list = BanList::open(Some(&self.ban_path()));
         if let Some(warning) = list.warning() {
             self.log(&warning);
@@ -104,6 +123,12 @@ impl App {
             Message::BanLastPlayer(name) => {
                 let name = name.clone();
                 if let Err(error) = self.ban_name(&name) {
+                    self.notify(Err(error), "");
+                }
+            }
+            Message::BanEarlyLeaver(name) => {
+                let name = name.clone();
+                if let Err(error) = self.ban_name_with(&name, EARLY_LEAVE_REASON) {
                     self.notify(Err(error), "");
                 }
             }

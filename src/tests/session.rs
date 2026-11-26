@@ -353,3 +353,14 @@ fn results_seen_during_cooldown_are_closed_when_it_ends() {
     let Phase::Cooldown(until) = engine.phase else { panic!("cooldown") };
     assert_eq!(engine.tick(until)[0].message, "ScoreScreenClose");
 }
+
+#[test]
+fn the_end_of_a_player_match_is_reported_once() {
+    let mut engine = armed();
+    engine.phase = Phase::InGame;
+    assert!(!engine.take_match_ended());
+    engine.on_event(&event("GameClosed", json!({})), 10);
+    assert!(engine.take_match_ended());
+    engine.on_event(&event("SetGlueScreen", json!({"screen":"SCORE_SCREEN"})), 11);
+    assert!(!engine.take_match_ended(), "the late results screen is not a second match");
+}

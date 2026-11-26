@@ -136,6 +136,9 @@ pub(super) fn run(
             if let Some(notice) = engine.take_notice() {
                 let _ = tx.send(Event::Activity(Activity::Command(notice)));
             }
+            if engine.take_match_ended() {
+                let _ = tx.send(Event::MatchEnded);
+            }
             if !matches!(
                 engine.phase,
                 Phase::Creating(_)
@@ -200,7 +203,8 @@ pub(super) fn run(
                 && engine.phase == Phase::Lobby
                 && let Some(lobby) = engine.owned_lobby(now)
                 && let Some(target) = ban_enforcer.next(lobby, &bans, now)
-                && manual_kick.request(target.clone(), &engine, now).is_some()
+                // A listed player who rejoins gets Warcraft III's native ban, not a kick.
+                && manual_kick.request_ban(target.clone(), &engine, now).is_some()
             {
                 manual_kick.set_reason(kick::ban_reason(
                     bans.matching(target.name()).map(|entry| entry.reason.as_str()),

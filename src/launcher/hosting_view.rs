@@ -211,6 +211,13 @@ pub fn view(app: &App) -> Element<'_, Message> {
 }
 
 fn lobby(app: &App) -> Element<'_, Message> {
+    // While a match runs there is no lobby; show who is playing in the same panel.
+    if app.in_game
+        && app.lobby.is_none()
+        && let Some(game) = app.last_game.as_ref().filter(|g| !g.players.is_empty())
+    {
+        return game_panel(app, game);
+    }
     let mut players = column![].spacing(0).width(Fill);
     let (name, count) = if let Some(lobby) = &app.lobby {
         for slot in &lobby.slots {
@@ -533,7 +540,7 @@ fn players(app: &App) -> Element<'_, Message> {
     if guests.is_empty() {
         return section
             .push(muted(if app.in_game {
-                "The game is running; its players are listed below."
+                "The game is running; its players are in the Current Game panel."
             } else {
                 "No players in the lobby yet. Levels come from ds-report.com."
             }))
@@ -543,13 +550,64 @@ fn players(app: &App) -> Element<'_, Message> {
     section.into()
 }
 
-/// Players of the game being played (or the last one), with a Ban button each.
-/// The lobby is gone once a game starts, so this is the place to ban during or after a match.
+/// The right-hand panel during a match: the game's players with level and a Ban button.
+fn game_panel<'a>(app: &'a App, game: &'a super::ban_list::LastGame) -> Element<'a, Message> {
+    let contents = column![
+        row![
+            text(&game.lobby)
+                .font(art::LABEL)
+                .size(21)
+                .color(p::GOLD)
+                .width(Fill),
+            muted(format!("{} other players", game.players.len()))
+        ]
+        .spacing(8)
+        .align_y(Alignment::Center),
+        iced::widget::rule::horizontal(1),
+        scrollable(
+            container(stats_table(app, game.players.iter().cloned(), true)).padding(iced::Padding {
+                right: 10.0,
+                ..Default::default()
+            })
+        )
+        .style(p::scrollbar)
+        .height(Fill),
+        iced::widget::rule::horizontal(1),
+        muted("Bans are saved now; banned players are removed with a native ban when they join a later lobby."),
+    ]
+    .spacing(9)
+    .height(Fill);
+    effects::frame(
+        container(
+            column![
+                heading("Current Game", Icon::Swords),
+                container(contents)
+                    .padding(iced::Padding {
+                        top: 8.0,
+                        right: 24.0,
+                        bottom: 22.0,
+                        left: 24.0
+                    })
+                    .height(Fill)
+            ]
+            .height(Fill),
+        )
+        .height(Fill)
+        .style(p::panel),
+    )
+}
+
+/// Players of the last game, with a Ban button each. During a match they are shown in the
+/// Current Game panel on the right instead. After an early end, offers "left early" bans.
 fn current_game(app: &App) -> Element<'_, Message> {
-    let Some(game) = app.last_game.as_ref().filter(|g| !g.players.is_empty()) else {
+    let Some(game) = app
+        .last_game
+        .as_ref()
+        .filter(|g| !g.players.is_empty() && !app.in_game)
+    else {
         return space().height(0).into();
     };
-    let title = if app.in_game { "In this game" } else { "Last game" };
+    let title = "Last game";
     let reason = effects::skin(
         text_input("Ban reason (optional)", &app.ban_form_reason)
             .on_input(Message::BanFormReason)
@@ -558,17 +616,53 @@ fn current_game(app: &App) -> Element<'_, Message> {
             .style(p::input),
         Frame::Input,
     );
-    column![
+    let mut section = column![
         row![
             text(title).size(16).color(p::GOLD).width(Fill),
             muted(&game.lobby)
         ]
         .align_y(Alignment::Center),
-        stats_table(app, game.players.iter().cloned(), true),
-        reason,
-        muted("Bans are saved to the ban list; banned players are removed when they join a later lobby."),
     ]
-    .spacing(6)
+    .spacing(6);
+    if let Some(seconds) = game.ended_early {
+        section = section.push(early_leavers(app, game, seconds));
+    }
+    section
+        .push(stats_table(app, game.players.iter().cloned(), true))
+        .push(reason)
+        .push(muted("Bans are saved to the ban list; banned players are removed with a native ban when they join a later lobby."))
+        .into()
+}
+
+/// After an early end: who left cannot be read from the game, so the host picks them.
+fn early_leavers<'a>(app: &App, game: &'a super::ban_list::LastGame, seconds: u64) -> Element<'a, Message> {
+    let mut buttons = row![].spacing(8);
+    for name in &game.players {
+        let banned = app.is_recently_banned(name);
+        buttons = buttons.push(action(
+            if banned { "Banned" } else { "Left early" },
+            Message::BanEarlyLeaver(name.clone()),
+            !banned,
+        ));
+    }
+    container(
+        column![
+            text(format!(
+                "Match ended early ({}:{:02}): someone left before 7 minutes.",
+                seconds / 60,
+                seconds % 60
+            ))
+            .size(14)
+            .color(p::ERROR),
+            muted("Click whoever left to ban them with the reason \"Left the game early\"."),
+            scrollable(buttons).direction(iced::widget::scrollable::Direction::Horizontal(
+                Default::default()
+            )),
+        ]
+        .spacing(6),
+    )
+    .padding(10)
+    .style(p::panel)
     .into()
 }
 

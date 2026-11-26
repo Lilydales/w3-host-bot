@@ -7,6 +7,23 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.10.0 — 2026-11-26
+
+### Added
+- **Current Game panel.** During a match the right-hand Lobby panel becomes "Current Game": every other player with DS level, matches, status and a **Ban** button. The left side no longer duplicates it.
+- **Early-leave bans.** The launcher times each match (`Event::MatchEnded`, sent once by `Engine::take_match_ended`). A match shorter than 7 minutes is marked "ended early" (Direct Strike ends the game when someone leaves before 7 minutes). The Last game section then shows a red notice and a **Left early** button per player that bans with the reason "Left the game early".
+  - Who left cannot be read from the game's local UI socket, so the host picks the player. If a future protocol log shows an in-game leave message, this can be automated.
+- Tests: `the_end_of_a_player_match_is_reported_once`, `a_short_match_is_marked_as_ended_early_and_leavers_get_the_early_reason`, `settings_start_folded_only_when_a_real_map_is_ready`.
+
+### Changed
+- **Banned players who rejoin get Warcraft III's native ban** (`BanPlayerFromGameLobby`, `request_ban`) instead of a plain kick. Bans are always saved locally first (`bans.json`); the native ban still falls back to the list if the game ignores it. `W3_NATIVE_BAN=0` restores plain kicks.
+- **Host settings start folded** when the profile is ready to host (map file exists, all fields valid), and fold again when hosting stops if still complete. Otherwise they open so you can fix them.
+- Version 0.9.1 → 0.10.0.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+- Not tested in game. The 7-minute rule is a fixed constant (`EARLY_END_SECONDS`).
+
 ## 0.9.1 — 2026-11-26
 
 ### Fixed

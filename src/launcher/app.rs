@@ -77,6 +77,8 @@ pub enum Message {
     BanFormSubmit,
     /// Ban a player from the last started game.
     BanLastPlayer(String),
+    /// Ban a player of an early-ended match with the "Left the game early" reason.
+    BanEarlyLeaver(String),
     /// Show or hide the host settings on the Hosting page.
     ToggleHostSettings,
     PollHost,
@@ -215,6 +217,8 @@ pub struct App {
     /// Host settings section on the Hosting page is expanded. Collapses when hosting
     /// starts and opens again when it stops, so the live lists get the space.
     pub settings_open: bool,
+    /// When the current match started, to tell an early end from a full game.
+    pub(super) game_started_at: Option<Instant>,
     pub hosting_status: String,
     pub(super) closing: Option<iced::window::Id>,
     probing: bool,
@@ -269,14 +273,26 @@ impl App {
             recent_kicks: VecDeque::new(),
             in_game: false,
             settings_open: true,
+            game_started_at: None,
             hosting_status: "Idle".into(),
             closing: None,
             probing: false,
             settings_due: None,
             started: Instant::now(),
         };
+        // Nothing to fill in: start with the settings folded away.
+        app.settings_open = !app.settings_complete();
         app.log("Launcher opened.");
         app
+    }
+
+    /// A map is chosen and every host field is valid, so Host would work as is.
+    pub(super) fn settings_complete(&self) -> bool {
+        self.store.is_some()
+            && self
+                .form
+                .read()
+                .is_ok_and(|profile| profile.map.as_deref().is_some_and(|map| map.is_file()))
     }
 
     pub(super) fn log(&mut self, line: &str) {
@@ -467,7 +483,8 @@ impl App {
             Message::BanFormTag(_)
             | Message::BanFormReason(_)
             | Message::BanFormSubmit
-            | Message::BanLastPlayer(_) => {
+            | Message::BanLastPlayer(_)
+            | Message::BanEarlyLeaver(_) => {
                 self.ban_message(&message);
             }
             Message::ConfirmBan => {

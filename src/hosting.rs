@@ -95,6 +95,8 @@ pub enum Event {
     DsStats(String, Option<crate::ds_report::DsStats>),
     /// A player was removed from the lobby: (player, reason).
     Kicked(String, String),
+    /// The host's own match ended (player mode). The launcher times it to spot early ends.
+    MatchEnded,
     Reserve(u32),
     Finished(Result<(), String>),
 }

@@ -120,6 +120,7 @@ impl App {
                 }
                 Event::LobbyCleared => self.lobby = None,
                 Event::Kicked(name, reason) => self.record_kick(name, reason),
+                Event::MatchEnded => self.match_ended(),
                 Event::DsStats(name, stats) => {
                     self.ds_stats.insert(name, stats);
                 }
@@ -141,7 +142,8 @@ impl App {
                     self.worker = None;
                     self.lobby = None;
                     self.in_game = false;
-                    self.settings_open = true;
+                    self.game_started_at = None;
+                    self.settings_open = !self.settings_complete();
                     self.ds_stats.clear();
                     self.hosting_status = if result.is_ok() {
                         "Stopped"
@@ -167,6 +169,28 @@ impl App {
         }
     }
 
+    /// The host's match ended. A short match means Direct Strike ended it because
+    /// someone left early; the launcher then offers one-click "left early" bans.
+    pub(super) fn match_ended(&mut self) {
+        self.in_game = false;
+        let Some(started) = self.game_started_at.take() else {
+            return;
+        };
+        let seconds = started.elapsed().as_secs();
+        let length = format!("{}:{:02}", seconds / 60, seconds % 60);
+        if super::ban_list::ended_early(seconds)
+            && let Some(game) = &mut self.last_game
+        {
+            game.ended_early = Some(seconds);
+            self.log_line(
+                &format!("Match ended early after {length} · someone left before 7 minutes"),
+                true,
+            );
+        } else {
+            self.log(&format!("Match finished after {length}"));
+        }
+    }
+
     pub(super) fn record_kick(&mut self, name: String, reason: String) {
         let seconds = self.started.elapsed().as_secs();
         self.log(&format!("Kicked · {name} · {reason}"));
@@ -186,6 +210,7 @@ impl App {
             }
             Activity::GameStarted(name) => {
                 self.in_game = true;
+                self.game_started_at = Some(Instant::now());
                 // Keep the levels of the players who are now in the game.
                 self.ds_stats.retain(|player, _| self.last_roster.1.contains(player));
                 // Remember who played so they can be banned after the match.
@@ -193,6 +218,7 @@ impl App {
                     self.last_game = Some(super::ban_list::LastGame {
                         lobby: name.clone(),
                         players: self.last_roster.1.clone(),
+                        ended_early: None,
                     });
                 }
                 self.log_line(&format!("Game started · {name}"), true)

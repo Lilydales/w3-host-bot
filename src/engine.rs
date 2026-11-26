@@ -55,6 +55,8 @@ pub struct Engine {
     score_close_pending: bool,
     /// The last glue screen reported was the match results screen.
     score_open: bool,
+    /// Player mode: set once when the host's match ends; read by the controller.
+    match_ended: bool,
 }
 
 impl Engine {
@@ -83,6 +85,7 @@ impl Engine {
             notice: None,
             score_close_pending: false,
             score_open: false,
+            match_ended: false,
         }
     }
 
@@ -410,6 +413,7 @@ impl Engine {
     /// Player mode: count the match, keep the results open for the rehost delay, then
     /// close them and host the next lobby (see the `Cooldown` arm of `tick`).
     fn player_match_over(&mut self, now: u64) {
+        self.match_ended = true;
         self.finish_game(now);
         if matches!(self.phase, Phase::Cooldown(_)) {
             self.score_close_pending = true;
@@ -420,6 +424,11 @@ impl Engine {
         } else {
             self.notice = Some("Match finished · hosting stops (rehost is off)".into());
         }
+    }
+
+    /// True once after the host's own match ended (player mode).
+    pub(crate) fn take_match_ended(&mut self) -> bool {
+        std::mem::take(&mut self.match_ended)
     }
 
     fn create(&mut self, now: u64) -> Vec<Command> {

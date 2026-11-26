@@ -440,3 +440,33 @@ fn host_settings_collapse_on_toggle_and_reopen_when_hosting_stops() {
     let _ = app.update(Message::Host);
     assert!(app.worker.is_none() && app.settings_open);
 }
+
+#[test]
+fn a_short_match_is_marked_as_ended_early_and_leavers_get_the_early_reason() {
+    use ghost_reforged::hosting::Activity;
+    let directory = tempfile::tempdir().unwrap();
+    let mut app = App::new(directory.path(), None);
+    let path = directory.path().join("bans-early.json");
+    app.ban_file = path.clone();
+    app.last_roster = ("DS #9".into(), vec!["Quitter#1".into(), "Stayer#2".into()]);
+    app.record_activity(Activity::GameStarted("DS #9".into()));
+    assert!(app.in_game);
+    app.match_ended();
+    assert!(!app.in_game);
+    let early = app.last_game.as_ref().unwrap().ended_early;
+    assert!(early.is_some_and(|s| s < 7 * 60), "an instant end is early");
+    let _ = app.update(Message::BanEarlyLeaver("Quitter#1".into()));
+    let list = ghost_reforged::bans::BanList::open(Some(&path));
+    assert_eq!(list.get("quitter#1").unwrap().reason, "Left the game early");
+    assert!(!list.is_banned("Stayer#2"));
+    assert!(super::ban_list::ended_early(6 * 60 + 59));
+    assert!(!super::ban_list::ended_early(7 * 60));
+}
+
+#[test]
+fn settings_start_folded_only_when_a_real_map_is_ready() {
+    let directory = tempfile::tempdir().unwrap();
+    assert!(App::new(directory.path(), None).settings_open, "no map yet");
+    let missing = App::new(directory.path().join("other").as_path(), Some("Nope.w3x".into()));
+    assert!(missing.settings_open, "a missing map file needs attention");
+}
