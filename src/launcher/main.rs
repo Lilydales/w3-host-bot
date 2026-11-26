@@ -5,6 +5,7 @@ mod art;
 #[cfg(all(test, windows))]
 mod audio_tests;
 mod backdrop;
+mod ban_list;
 mod backdrop_view;
 mod chrome;
 mod desktop;
