@@ -141,6 +141,7 @@ impl App {
                     self.worker = None;
                     self.lobby = None;
                     self.in_game = false;
+                    self.settings_open = true;
                     self.ds_stats.clear();
                     self.hosting_status = if result.is_ok() {
                         "Stopped"

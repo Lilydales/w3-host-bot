@@ -77,6 +77,8 @@ pub enum Message {
     BanFormSubmit,
     /// Ban a player from the last started game.
     BanLastPlayer(String),
+    /// Show or hide the host settings on the Hosting page.
+    ToggleHostSettings,
     PollHost,
     CloseRequested(iced::window::Id),
     Browse,
@@ -210,6 +212,9 @@ pub struct App {
     pub recent_kicks: VecDeque<KickEntry>,
     /// A game started from our lobby is being played (cleared by the next lobby).
     pub in_game: bool,
+    /// Host settings section on the Hosting page is expanded. Collapses when hosting
+    /// starts and opens again when it stops, so the live lists get the space.
+    pub settings_open: bool,
     pub hosting_status: String,
     pub(super) closing: Option<iced::window::Id>,
     probing: bool,
@@ -263,6 +268,7 @@ impl App {
             ban_file: Self::locate_ban_file(directory),
             recent_kicks: VecDeque::new(),
             in_game: false,
+            settings_open: true,
             hosting_status: "Idle".into(),
             closing: None,
             probing: false,
@@ -410,7 +416,14 @@ impl App {
             }
             Message::Host if self.worker.is_none() && !self.picking && self.closing.is_none() => {
                 let result = self.start_hosting();
+                if result.is_ok() {
+                    self.settings_open = false;
+                }
                 self.notify(result, "");
+            }
+            Message::ToggleHostSettings => {
+                self.motion.close_menus();
+                self.settings_open = !self.settings_open;
             }
             Message::Stop => {
                 self.ban_prompt = None;

@@ -7,6 +7,24 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.9.0 — 2026-11-26
+
+### Added
+- **Collapsible host settings** on the Hosting page. Profile, map, game name, next number, auto start and the live DS filter sit in one section.
+  - Collapsed: map file name plus one summary line (e.g. "Mix Mode DS #5 · Auto start: Full · Filter off") and an **Edit ▾** link.
+  - Expanded: the same fields as before, with a **Hide host settings ▴** link on the Profile label row (no extra height, so existing layout and UI tests keep their positions).
+  - Collapses automatically when Host succeeds; reopens when hosting stops. Can be toggled any time; the DS filter stays live while expanded.
+- Players / In this game / Recent kicks get the freed space (separated by a rule).
+- `Message::ToggleHostSettings`, `App::settings_open`, `hosting_view::settings_summary`.
+- Tests: `collapsed_settings_summarise_name_start_rule_and_filter`, `host_settings_collapse_on_toggle_and_reopen_when_hosting_stops`.
+
+### Changed
+- Version 0.8.0 → 0.9.0.
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+- `ui_tests` click positions were not re-measured; the expanded layout should be unchanged except for a rule above Players.
+
 ## 0.8.0 — 2026-11-26
 
 ### Added

@@ -426,3 +426,17 @@ fn ds_minimums_are_live_settings_and_game_players_stay_listed_with_levels() {
     assert!(app.ds_stats.contains_key("Mate#1"), "levels of game players are kept");
     assert!(!app.ds_stats.contains_key("Gone#2"));
 }
+
+#[test]
+fn host_settings_collapse_on_toggle_and_reopen_when_hosting_stops() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut app = App::new(directory.path(), None);
+    assert!(app.settings_open, "open while idle");
+    let _ = app.update(Message::ToggleHostSettings);
+    assert!(!app.settings_open);
+    let _ = app.update(Message::ToggleHostSettings);
+    assert!(app.settings_open);
+    // A failed Host (no map) keeps the settings open so the error can be fixed.
+    let _ = app.update(Message::Host);
+    assert!(app.worker.is_none() && app.settings_open);
+}

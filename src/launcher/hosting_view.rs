@@ -11,7 +11,7 @@ use super::{
 use ghost_reforged::ds_report::{self, DsStats, Lookup};
 use iced::{
     Alignment, Element, Fill, Length,
-    widget::{column, container, row, scrollable, space, text, text_input},
+    widget::{button, column, container, row, scrollable, space, text, text_input},
 };
 
 pub fn view(app: &App) -> Element<'_, Message> {
@@ -80,52 +80,78 @@ pub fn view(app: &App) -> Element<'_, Message> {
         ]
     }
     .spacing(12);
-    let inputs = column![
+    let settings: Element<'_, Message> = if app.settings_open {
         column![
-            label("Profile", Icon::User),
-            row![
-                selector,
-                action(
-                    "New",
-                    Message::NewProfile,
-                    editable && app.profiles.items.len() < 30
-                )
-            ]
-            .spacing(9)
-            .align_y(Alignment::Center)
-        ]
-        .spacing(2),
-        column![
-            label("Map", Icon::Map),
-            row![map, action("Browse", Message::Browse, idle && !app.picking)]
+            column![
+                // The toggle shares the Profile label row, so the expanded layout
+                // keeps its original height and positions.
+                row![
+                    container(label("Profile", Icon::User)).width(Fill),
+                    toggle("Hide host settings ▴"),
+                ]
+                .align_y(Alignment::Center),
+                row![
+                    selector,
+                    action(
+                        "New",
+                        Message::NewProfile,
+                        editable && app.profiles.items.len() < 30
+                    )
+                ]
                 .spacing(9)
                 .align_y(Alignment::Center)
-        ]
-        .spacing(2),
-        row![
-            field_enabled(
-                "Game name",
-                &app.form.profile.lobby_pattern,
-                Field::Pattern,
-                idle
-            ),
-            column![
-                space().height(20),
-                action(
-                    "Use map name",
-                    Message::MapName,
-                    editable && app.form.profile.map.is_some()
-                )
             ]
+            .spacing(2),
+            column![
+                label("Map", Icon::Map),
+                row![map, action("Browse", Message::Browse, idle && !app.picking)]
+                    .spacing(9)
+                    .align_y(Alignment::Center)
+            ]
+            .spacing(2),
+            row![
+                field_enabled(
+                    "Game name",
+                    &app.form.profile.lobby_pattern,
+                    Field::Pattern,
+                    idle
+                ),
+                column![
+                    space().height(20),
+                    action(
+                        "Use map name",
+                        Message::MapName,
+                        editable && app.form.profile.map.is_some()
+                    )
+                ]
+            ]
+            .spacing(8)
+            .align_y(Alignment::End),
+            row![
+                field_enabled("Next number", &app.form.number, Field::Number, idle),
+                start_rule
+            ]
+            .spacing(24),
+            ds_filter(app),
         ]
-        .spacing(8)
-        .align_y(Alignment::End),
-        row![
-            field_enabled("Next number", &app.form.number, Field::Number, idle),
-            start_rule
+        .spacing(12)
+        .into()
+    } else {
+        column![
+            row![
+                text("Host settings").size(16).color(p::GOLD).width(Fill),
+                toggle("Edit ▾"),
+            ]
+            .align_y(Alignment::Center),
+            text(app.form.profile.map_label()).size(15),
+            muted(settings_summary(app)),
         ]
-        .spacing(24),
-        ds_filter(app),
+        .spacing(4)
+        .into()
+    };
+    let inputs = column![
+        settings,
+        iced::widget::rule::horizontal(1),
         players(app),
         current_game(app),
         recent_kicks(app),
@@ -337,6 +363,38 @@ fn host_role(own: Option<&ghost_reforged::hosting::Slot>, player_host: bool) -> 
         None if player_host => "Host".into(),
         None => "Observer".into(),
     }
+}
+
+/// A small text link that shows or hides the host settings. Kept no taller than a label.
+fn toggle<'a>(caption: &'static str) -> Element<'a, Message> {
+    effects::hover(
+        button(text(caption).size(14).color(p::GOLD))
+            .padding([0, 4])
+            .style(p::inset)
+            .on_press(Message::ToggleHostSettings),
+        true,
+    )
+}
+
+/// One line describing the collapsed settings: game name, auto start and filter.
+pub(super) fn settings_summary(app: &App) -> String {
+    let number = app.form.number.trim().parse().unwrap_or(app.form.profile.next_number);
+    let start = if app.form.profile.require_full {
+        "Auto start: Full".to_string()
+    } else {
+        format!("Auto start: {} players", app.form.players.trim())
+    };
+    let (level, matches) = filter_minimums(app);
+    let filter = match (level, matches) {
+        (0, 0) => "Filter off".to_string(),
+        (level, 0) => format!("Min level {level}"),
+        (0, matches) => format!("Min {matches} matches"),
+        (level, matches) => format!("Min level {level} · {matches} matches"),
+    };
+    format!(
+        "{} · {start} · {filter}",
+        app.form.profile.lobby_name(number)
+    )
 }
 
 /// One row of the Players section: (level, matches, status, colour).
@@ -556,6 +614,24 @@ fn ban_prompt<'a>(player: &'a str, reason: &'a str) -> Element<'a, Message> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn collapsed_settings_summarise_name_start_rule_and_filter() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut app = App::new(directory.path(), None);
+        app.form.profile.lobby_pattern = "Mix Mode DS #{n}".into();
+        app.form.number = "5".into();
+        app.form.profile.require_full = true;
+        assert_eq!(settings_summary(&app), "Mix Mode DS #5 · Auto start: Full · Filter off");
+        app.form.profile.require_full = false;
+        app.form.players = "6".into();
+        app.form.min_ds_level = "10".into();
+        app.form.min_ds_matches = "100".into();
+        assert_eq!(
+            settings_summary(&app),
+            "Mix Mode DS #5 · Auto start: 6 players · Min level 10 · 100 matches"
+        );
+    }
 
     #[test]
     fn player_rows_show_level_matches_and_filter_status() {
