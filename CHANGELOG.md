@@ -7,6 +7,24 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.9.1 — 2026-11-26
+
+### Fixed
+- **Play-as-host did not leave the results screen and rehost.** The match end is now detected from either signal the game sends: `GameClosed` (arrives just before the results) or `SetGlueScreen SCORE_SCREEN`, in any phase where the lobby is still ours, not only `InGame`. Before, a missed countdown/loading callback (or a reconnect) left the engine outside `InGame`, so the results screen was ignored. Counted once (`Engine::player_match_over`).
+- At the end of the results delay the bot closes the results if they are open, even when they appeared after the match was counted (`score_open`), then waits for a menu screen before creating the next lobby (`menu_required`, same as the observer path).
+- The Direct Strike map (`war3map.j`) ends every match with `CustomVictoryBJ(p, false, true)` / `EndGame(true)`, i.e. straight to the results screen, which is what the above relies on. Its `"score"` stats go to the game's stat channel, not the local UI socket, so the bot cannot read them.
+
+### Added
+- Activity shows `Game screen · <screen> · <bot state>` and `Game event · GameClosed …`, so a stuck end of match can be diagnosed from the Activity page.
+- Tests: `a_player_match_that_ended_unnoticed_is_still_closed_and_rehosted`, `results_seen_during_cooldown_are_closed_when_it_ends`; updated `next_lobby_waits_for_score_screen_cooldown_and_fresh_provider` (it expected the results to close instantly, which 0.8.0 changed) and the 0.8.0 rehost test (now waits for a menu).
+
+### Changed
+- Version 0.9.0 → 0.9.1 (fix).
+
+### Not verified
+- Not compiled or run here (no Rust toolchain). Run `cargo test`.
+- Not tested in game. If it still sticks, the Activity lines show which screen/event the game sent last.
+
 ## 0.9.0 — 2026-11-26
 
 ### Added

@@ -427,15 +427,21 @@ fn next_lobby_waits_for_score_screen_cooldown_and_fresh_provider() {
             .on_event(&event("GameList", json!({})), 1000)
             .is_empty()
     );
-    engine.on_event(&event("GameClosed", json!({})), 1001);
-    assert_eq!(engine.phase, Phase::InGame);
+    // Player host: GameClosed ends the match; the results stay open for the rehost delay.
+    assert!(engine.on_event(&event("GameClosed", json!({})), 1001).is_empty());
+    assert_eq!(engine.phase, Phase::Cooldown(1016));
     let score = event("SetGlueScreen", json!({"screen":"SCORE_SCREEN"}));
-    assert_eq!(engine.on_event(&score, 1001)[0].message, "ScoreScreenClose");
+    assert!(engine.on_event(&score, 1001).is_empty());
     assert!(engine.on_event(&score, 1002).is_empty());
     assert!(engine.tick(1015).is_empty());
-    assert_eq!(engine.phase, Phase::Cooldown(1016));
-    engine.tick(1016);
+    assert_eq!(engine.number(), 2, "counted once");
+    assert_eq!(
+        engine.tick(1016).iter().map(|c| c.message).collect::<Vec<_>>(),
+        ["ScoreScreenClose", "InitializeNetProvider"]
+    );
     assert!(engine.tick(1100).is_empty());
+    assert!(engine.on_event(&event("GameList", json!({})), 1100).is_empty(), "waits for the menu");
+    engine.on_event(&event("SetGlueScreen", json!({"screen":"MULTIPLAYER_CUSTOM_GAMES_SETUP"})), 1101);
     engine.on_event(&event("GameList", json!({})), 1101);
     let commands = engine.on_event(
         &event("OnNetProviderChanged", json!({"providerId":"BNET"})),

@@ -53,6 +53,8 @@ pub struct Engine {
     /// Player mode: the match ended and the results screen is still open. It is closed
     /// when the rehost delay ends, so the player can read the results first.
     score_close_pending: bool,
+    /// The last glue screen reported was the match results screen.
+    score_open: bool,
 }
 
 impl Engine {
@@ -80,6 +82,7 @@ impl Engine {
             retry_start_after: 0,
             notice: None,
             score_close_pending: false,
+            score_open: false,
         }
     }
 
@@ -139,6 +142,20 @@ impl Engine {
         }
         let kind = event["messageType"].as_str().unwrap_or("");
         let payload = &event["payload"];
+        if kind == "SetGlueScreen" {
+            self.score_open = payload["screen"] == "SCORE_SCREEN";
+        }
+        // Player mode: the host's own match ended. `GameClosed` arrives just before the
+        // results screen; either one is enough, and only the first one counts the game.
+        if self.config.host_mode == HostMode::Player
+            && self.owned
+            && (kind == "GameClosed"
+                || (kind == "SetGlueScreen" && payload["screen"] == "SCORE_SCREEN"))
+            && !matches!(self.phase, Phase::Creating(_) | Phase::Leaving(_))
+        {
+            self.player_match_over(now);
+            return Vec::new();
+        }
         if !self.owned
             && (self.awaiting_session() || self.phase == Phase::WatchingGame)
             && kind == "SetGlueScreen"
@@ -361,21 +378,6 @@ impl Engine {
                     }
                     self.phase = Phase::InGame;
                 }
-                Some("SCORE_SCREEN")
-                    if self.config.host_mode == HostMode::Player
-                        && self.phase == Phase::InGame =>
-                {
-                    // The host played this match. Count it, keep the results visible for
-                    // the rehost delay, then return to the menu and host the next lobby.
-                    self.finish_game(now);
-                    if matches!(self.phase, Phase::Cooldown(_)) {
-                        self.score_close_pending = true;
-                        self.notice = Some(format!(
-                            "Match finished · next lobby in {} s",
-                            self.config.rehost_delay_seconds
-                        ));
-                    }
-                }
                 Some("SCORE_SCREEN") if self.config.host_mode == HostMode::Player => {}
                 Some("SCORE_SCREEN") => {
                     self.finish_game(now);
@@ -403,6 +405,21 @@ impl Engine {
             _ => {}
         }
         self.tick(now)
+    }
+
+    /// Player mode: count the match, keep the results open for the rehost delay, then
+    /// close them and host the next lobby (see the `Cooldown` arm of `tick`).
+    fn player_match_over(&mut self, now: u64) {
+        self.finish_game(now);
+        if matches!(self.phase, Phase::Cooldown(_)) {
+            self.score_close_pending = true;
+            self.notice = Some(format!(
+                "Match finished · next lobby in {} s",
+                self.config.rehost_delay_seconds
+            ));
+        } else {
+            self.notice = Some("Match finished · hosting stops (rehost is off)".into());
+        }
     }
 
     fn create(&mut self, now: u64) -> Vec<Command> {
@@ -498,7 +515,11 @@ impl Engine {
             }
             Phase::Cooldown(until) if now >= until => {
                 self.phase = Phase::AwaitMenu;
-                if std::mem::take(&mut self.score_close_pending) {
+                let player_results = self.config.host_mode == HostMode::Player && self.score_open;
+                if std::mem::take(&mut self.score_close_pending) || player_results {
+                    // Wait for the menu before creating, exactly like the observer path.
+                    self.menu_required = true;
+                    self.provider_ready = false;
                     // Same return path as the observer host after a match.
                     return vec![
                         Command::empty("ScoreScreenClose"),

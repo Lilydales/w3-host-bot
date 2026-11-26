@@ -277,14 +277,19 @@ fn a_player_host_sees_the_results_then_returns_and_hosts_the_next_lobby() {
     );
     assert_eq!(engine.phase, Phase::AwaitMenu);
     assert!(engine.tick(116).is_empty(), "closed once");
-    // Back on the custom games screen the next lobby is created.
-    let next = engine.on_event(
-        &event("OnNetProviderChanged", json!({"providerId":"BNET"})),
-        117,
+    // Nothing is created until the game reports a menu again.
+    assert!(engine.on_event(&event("GameList", json!({})), 117).is_empty());
+    engine.on_event(
+        &event("SetGlueScreen", json!({"screen":"MULTIPLAYER_CUSTOM_GAMES_SETUP"})),
+        118,
     );
-    let _ = next;
-    let created = engine.on_event(&event("GameList", json!({})), 118);
-    assert!(created.iter().any(|c| matches!(c.message, "CreateLobby" | "InitializeNetProvider")));
+    let next = engine.on_event(&event("GameList", json!({})), 119);
+    assert_eq!(next[0].message, "InitializeNetProvider");
+    let created = engine.on_event(
+        &event("OnNetProviderChanged", json!({"providerId":"BNET"})),
+        120,
+    );
+    assert_eq!(created[0].message, "CreateLobby");
 }
 
 #[test]
@@ -322,4 +327,29 @@ fn a_player_host_without_rehost_keeps_the_results_and_stops() {
         engine.phase,
         Phase::Stopped("Configured game limit reached".into())
     );
+}
+
+#[test]
+fn a_player_match_that_ended_unnoticed_is_still_closed_and_rehosted() {
+    // The game reached the results without the bot seeing it start (no countdown or
+    // loading callbacks), e.g. after a dropped connection. The lobby is still ours.
+    let mut engine = armed();
+    assert_eq!(engine.phase, Phase::Lobby);
+    engine.on_event(&event("SetGlueScreen", json!({"screen":"SCORE_SCREEN"})), 50);
+    assert!(matches!(engine.phase, Phase::Cooldown(_)));
+    assert_eq!(engine.number(), 2);
+    let Phase::Cooldown(until) = engine.phase else { unreachable!() };
+    assert_eq!(engine.tick(until)[0].message, "ScoreScreenClose");
+}
+
+#[test]
+fn results_seen_during_cooldown_are_closed_when_it_ends() {
+    let mut engine = armed();
+    engine.phase = Phase::InGame;
+    engine.on_event(&event("GameClosed", json!({})), 10);
+    // A late results screen after the game was already counted.
+    assert!(engine.on_event(&event("SetGlueScreen", json!({"screen":"SCORE_SCREEN"})), 12).is_empty());
+    assert_eq!(engine.number(), 2);
+    let Phase::Cooldown(until) = engine.phase else { panic!("cooldown") };
+    assert_eq!(engine.tick(until)[0].message, "ScoreScreenClose");
 }

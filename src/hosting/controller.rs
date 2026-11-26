@@ -335,6 +335,20 @@ pub(super) fn run(
                     }
                     Some("SetGlueScreen" | "LobbyCountdown") => {
                         let _ = tx.send(Event::VisualChanged);
+                        // Visible trail of what the game reported, for end-of-match issues.
+                        if let Some(screen) = event["payload"]["screen"].as_str() {
+                            let _ = tx.send(Event::Activity(Activity::Command(format!(
+                                "Game screen · {screen} · {}",
+                                phase_label(&engine.phase, now)
+                            ))));
+                        }
+                    }
+                    Some("GameClosed" | "ExitedGame") => {
+                        let _ = tx.send(Event::Activity(Activity::Command(format!(
+                            "Game event · {} · {}",
+                            event["messageType"].as_str().unwrap_or(""),
+                            phase_label(&engine.phase, now)
+                        ))));
                     }
                     _ => {}
                 }
