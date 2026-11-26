@@ -33,6 +33,8 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
     let mut settings: iced::widget::Column<'a, Message> = column![
         muted(format!("Profile · {}", profile.title)),
         rule::horizontal(1),
+        super::ban_list::section(app),
+        rule::horizontal(1),
         text("Welcome message").size(20),
         toggler(profile.welcome.enabled)
             .label("Welcome joining players")
