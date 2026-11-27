@@ -7,6 +7,12 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.18.3 - 2026-11-27
+
+### Fixed
+- UI test `rendered_menu_opens_selects_and_closes_without_clicking_underneath` still could not reach the Auto start menu. Since 0.17.4 the expanded host settings shared the Auto Host panel 3 : 2 with Recent activity, which pushed the Auto start row below the visible part of its scroll area. While editing, the settings form now uses the whole panel; Recent activity shows again when the settings are folded. Real app fix: the Auto start menu was hard to reach by hand too.
+- Bumped the bot and Windows installer to 0.18.3.
+
 ## 0.18.2 - 2026-11-27
 
 ### Fixed

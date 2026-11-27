@@ -162,30 +162,32 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
             ..Default::default()
         })
     };
-    // Settings and kicks scroll on their own. While editing they share the panel with
-    // Recent activity; folded, they take only the height they need.
+    // Settings and kicks scroll on their own. While editing, the form takes the whole
+    // panel so every field (including the Auto start menu) is visible; Recent activity
+    // returns when the settings are folded.
     let top = scrollable(padded(inputs.into()).width(Fill)).style(p::scrollbar);
-    let top: Element<'_, Message> = if app.settings_open {
-        container(top).height(Length::FillPortion(3)).into()
+    let (top, activity): (Element<'_, Message>, Element<'_, Message>) = if app.settings_open {
+        (
+            container(top).height(Fill).into(),
+            space().height(0).into(),
+        )
     } else {
-        container(top.height(Length::Shrink))
-            .max_height(TOP_FOLDED_MAX)
-            .into()
+        (
+            container(top.height(Length::Shrink))
+                .max_height(TOP_FOLDED_MAX)
+                .into(),
+            column![
+                iced::widget::rule::horizontal(1),
+                activity_header(),
+                scrollable(padded(activity_list(app)).width(Fill))
+                    .style(p::scrollbar)
+                    .height(Fill),
+            ]
+            .spacing(8)
+            .height(Fill)
+            .into(),
+        )
     };
-    let activity: Element<'_, Message> = column![
-        iced::widget::rule::horizontal(1),
-        activity_header(),
-        scrollable(padded(activity_list(app)).width(Fill))
-            .style(p::scrollbar)
-            .height(Fill),
-    ]
-    .spacing(8)
-    .height(if app.settings_open {
-        Length::FillPortion(2)
-    } else {
-        Length::Fill
-    })
-    .into();
     let left = effects::frame(
         container(
             column![
