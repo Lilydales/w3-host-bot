@@ -7,6 +7,12 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.18.1 - 2026-11-27
+
+### Fixed
+- Build error in 0.18.0: the status-bar text helper took the font size as `u16`, which `iced::Pixels` does not accept. It now takes `u32`. No behaviour change.
+- Bumped the bot and Windows installer to 0.18.1. The push-triggered Windows workflow compiles and tests it.
+
 ## 0.18.0 - 2026-11-27
 
 ### Changed

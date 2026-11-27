@@ -597,7 +597,7 @@ pub(super) fn shorten(text: &str) -> String {
     }
 }
 
-fn one_line<'a>(value: &str, size: u16, color: iced::Color) -> Element<'a, Message> {
+fn one_line<'a>(value: &str, size: u32, color: iced::Color) -> Element<'a, Message> {
     let line = text(shorten(value))
         .size(size)
         .color(color)
