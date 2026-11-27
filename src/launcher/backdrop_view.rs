@@ -10,9 +10,12 @@ use iced::{
 };
 use std::cell::RefCell;
 
-pub const HEADER: f32 = 166.0;
-pub const SIDEBAR: f32 = 208.0;
-pub const SIDEBAR_GAP: f32 = 8.0;
+/// The header holds the brand, page tabs and window controls in one row.
+pub const HEADER: f32 = 92.0;
+pub const TAB_HEIGHT: f32 = 54.0;
+pub const TAB_TOP: f32 = 22.0;
+/// Pages use the full width; this matches the right margin.
+pub const LEFT: f32 = 20.0;
 pub const RIGHT: f32 = 20.0;
 pub const BOTTOM: f32 = 24.0;
 pub const COLUMNS_GAP: f32 = 12.0;
@@ -122,7 +125,7 @@ fn visible_regions(bounds: Rectangle, coverage: Coverage) -> Vec<Rectangle> {
     if coverage == Coverage::None || bounds.width < 600.0 || bounds.height < 500.0 {
         return vec![bounds];
     }
-    let left = SIDEBAR + SIDEBAR_GAP;
+    let left = LEFT;
     let body_width = bounds.width - left - RIGHT;
     let body_height = bounds.height - HEADER - BOTTOM;
     let rect = |x, y, width, height| Rectangle {
@@ -250,12 +253,12 @@ mod tests {
                 assert!(
                     regions
                         .iter()
-                        .any(|r| r.contains(iced::Point::new(100.0, 600.0)))
+                        .any(|r| r.contains(iced::Point::new(10.0, 600.0)))
                 );
                 assert!(
                     !regions
                         .iter()
-                        .any(|r| r.contains(iced::Point::new(400.0, 400.0)))
+                        .any(|r| r.contains(iced::Point::new(300.0, 400.0)))
                 );
             }
             assert_eq!(visible_regions(bounds, Coverage::None), vec![bounds]);

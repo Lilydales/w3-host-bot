@@ -15,7 +15,7 @@ use iced::{
     widget::{button, column, container, row, scrollable, space, text, text_input},
 };
 
-pub fn view(app: &App) -> Element<'_, Message> {
+pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
     let idle = app.worker.is_none();
     let editable = idle && !app.picking && app.store.is_some();
     let selector: Element<'_, Message> = if editable {
@@ -154,32 +154,50 @@ pub fn view(app: &App) -> Element<'_, Message> {
         iced::widget::rule::horizontal(1),
         current_game(app),
         recent_kicks(app),
-        iced::widget::rule::horizontal(1),
-        recent_activity(app),
     ]
     .spacing(12);
+    let padded = |content: Element<'a, Message>| {
+        container(content).padding(iced::Padding {
+            right: 10.0,
+            ..Default::default()
+        })
+    };
+    // Settings and kicks scroll on their own. While editing they share the panel with
+    // Recent activity; folded, they take only the height they need.
+    let top = scrollable(padded(inputs.into()).width(Fill)).style(p::scrollbar);
+    let top: Element<'_, Message> = if app.settings_open {
+        container(top).height(Length::FillPortion(3)).into()
+    } else {
+        container(top.height(Length::Shrink))
+            .max_height(TOP_FOLDED_MAX)
+            .into()
+    };
+    let activity: Element<'_, Message> = column![
+        iced::widget::rule::horizontal(1),
+        activity_header(),
+        scrollable(padded(activity_list(app)).width(Fill))
+            .style(p::scrollbar)
+            .height(Fill),
+    ]
+    .spacing(8)
+    .height(if app.settings_open {
+        Length::FillPortion(2)
+    } else {
+        Length::Fill
+    })
+    .into();
     let left = effects::frame(
         container(
             column![
                 heading("Auto Host", Icon::Tower),
-                container(
-                    scrollable(
-                        container(inputs)
-                            .padding(iced::Padding {
-                                right: 10.0,
-                                ..Default::default()
-                            })
-                            .width(Fill)
-                    )
-                    .style(p::scrollbar)
-                )
-                .padding(iced::Padding {
-                    top: 0.0,
-                    left: 24.0,
-                    right: 24.0,
-                    bottom: 22.0
-                })
-                .height(Fill),
+                container(column![top, activity].spacing(12).height(Fill))
+                    .padding(iced::Padding {
+                        top: 0.0,
+                        left: 24.0,
+                        right: 24.0,
+                        bottom: 22.0
+                    })
+                    .height(Fill),
             ]
             .height(Fill),
         )
@@ -247,12 +265,14 @@ fn status_bar<'a>(app: &'a App, controls: iced::widget::Row<'a, Message>) -> Ele
         status_line(app),
     ]
     .spacing(4);
-    if !app.notice.is_empty() {
-        info = info.push(text(&app.notice).size(13).color(if app.notice_error {
-            p::ERROR
-        } else {
-            p::MUTED
-        }));
+    // The notice often repeats the status ("Retrying automatically…"); show it only
+    // when it adds something.
+    if !app.notice.is_empty() && app.notice != app.hosting_status {
+        info = info.push(one_line(
+            &app.notice,
+            13,
+            if app.notice_error { p::ERROR } else { p::MUTED },
+        ));
     }
     let preview = effects::hover(
         button(
@@ -272,7 +292,7 @@ fn status_bar<'a>(app: &'a App, controls: iced::widget::Row<'a, Message>) -> Ele
     );
     effects::frame(
         container(
-            row![container(info).width(Fill), preview, controls.spacing(12)]
+            row![container(info).width(Fill).clip(true), preview, controls.spacing(12)]
                 .spacing(14)
                 .align_y(Alignment::Center),
         )
@@ -554,11 +574,46 @@ fn status_line(app: &App) -> Element<'_, Message> {
             },
             ..Default::default()
         });
-    row![dot, text(label.to_string()).size(14).color(color).width(Fill)]
+    row![dot, one_line(label, 14, color)]
         .spacing(8)
         .align_y(Alignment::Center)
         .width(Fill)
         .into()
+}
+
+/// Longest status or notice shown in the status bar before "…". The full text is in a
+/// tooltip and on the Activity page.
+const STATUS_CHARS: usize = 90;
+
+/// `text` shortened to `STATUS_CHARS` on one line, never wrapping into a second line
+/// that the fixed-height status bar would crop.
+pub(super) fn shorten(text: &str) -> String {
+    let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if flat.chars().count() <= STATUS_CHARS {
+        flat
+    } else {
+        let cut: String = flat.chars().take(STATUS_CHARS - 1).collect();
+        format!("{}…", cut.trim_end())
+    }
+}
+
+fn one_line<'a>(value: &str, size: u16, color: iced::Color) -> Element<'a, Message> {
+    let line = text(shorten(value))
+        .size(size)
+        .color(color)
+        .wrapping(iced::widget::text::Wrapping::None)
+        .width(Fill);
+    if shorten(value) == value {
+        return line.into();
+    }
+    iced::widget::tooltip(
+        line,
+        container(text(value.to_string()).size(13).width(Length::Fixed(420.0)))
+            .padding(10)
+            .style(p::panel),
+        iced::widget::tooltip::Position::Bottom,
+    )
+    .into()
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -984,24 +1039,31 @@ fn level_badge<'a>(app: &App, name: &str) -> Element<'a, Message> {
     text(label).size(13).color(color).into()
 }
 
-/// The newest Activity lines, so status changes are visible without leaving the page.
-const ACTIVITY_LINES: usize = 10;
+/// Folded host settings, Last game and Recent kicks never take more than this height;
+/// beyond it they scroll, so Recent activity always keeps room.
+const TOP_FOLDED_MAX: f32 = 300.0;
 
-fn recent_activity(app: &App) -> Element<'_, Message> {
-    let mut list = column![
-        row![
-            text("Recent activity").size(16).color(p::GOLD).width(Fill),
-            effects::hover(
-                button(text("Open log ▸").size(14).color(p::GOLD))
-                    .padding([0, 4])
-                    .style(p::inset)
-                    .on_press(Message::Page(super::app::Page::Activity)),
-                true,
-            )
-        ]
-        .align_y(Alignment::Center)
+/// Activity lines kept in the Hosting page list (the full log is on the Activity page).
+const ACTIVITY_LINES: usize = 60;
+
+fn activity_header<'a>() -> Element<'a, Message> {
+    row![
+        text("Recent activity").size(16).color(p::GOLD).width(Fill),
+        effects::hover(
+            button(text("Open log ▸").size(14).color(p::GOLD))
+                .padding([0, 4])
+                .style(p::inset)
+                .on_press(Message::Page(super::app::Page::Activity)),
+            true,
+        )
     ]
-    .spacing(4);
+    .align_y(Alignment::Center)
+    .into()
+}
+
+/// Newest first, in its own scroll area so it never pushes the settings away.
+fn activity_list(app: &App) -> Element<'_, Message> {
+    let mut list = column![].spacing(4);
     if app.logs.is_empty() {
         list = list.push(muted("Nothing yet."));
     }
@@ -1128,6 +1190,14 @@ mod tests {
         let rows = settings_rows(&app);
         assert_eq!(get(&rows, "Auto-quit").as_deref(), Some("on · 5 s"));
         assert_eq!(get(&rows, "Rehost").as_deref(), Some("on"));
+    }
+
+    #[test]
+    fn status_text_is_one_short_line() {
+        assert_eq!(shorten("Lobby  open\n now"), "Lobby open now");
+        let long = "Start Warcraft III before hosting on this installation. Retrying automatically in 60 s… and more text here";
+        let short = shorten(long);
+        assert!(short.ends_with('…') && short.chars().count() <= STATUS_CHARS);
     }
 
     #[test]

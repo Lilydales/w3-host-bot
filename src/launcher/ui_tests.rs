@@ -102,7 +102,7 @@ impl Harness {
             &mut self.renderer,
         );
         let mut found = None;
-        let mut y = 150.0;
+        let mut y = 4.0;
         'scan: while y < self.size.height {
             let mut x = 4.0;
             while x < self.size.width {

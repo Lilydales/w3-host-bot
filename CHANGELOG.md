@@ -7,6 +7,23 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.18.0 - 2026-11-27
+
+### Changed
+- **Navigation moved from the left sidebar to the header.** Hosting, Profiles, Options and Activity are tabs next to the brand; pages now use the full window width. The header is 92 px tall (was 166), giving every page about 74 px more height.
+- The Warcraft III status (Online / Offline / Checking) is a coloured light next to the brand, with the details in its tooltip.
+- **Hosting status bar no longer crops text.** The status and notice lines stay on one line, are shortened with "…" past 90 characters (full text in a tooltip and on the Activity page), and the notice is hidden when it only repeats the status.
+- Dragging the window works on the brand and on the empty header space.
+- Backdrop strips follow the new layout (`backdrop_view::LEFT`, `TAB_HEIGHT`, `TAB_TOP`; `SIDEBAR` removed). UI test search now scans from the top of the window.
+- Test: `status_text_is_one_short_line`; backdrop test points updated for the full-width layout.
+- Bumped the bot and Windows installer to 0.18.0. No hosting behaviour changed. Not compiled in the editing environment; the push-triggered Windows workflow runs the tests.
+
+## 0.17.4 - 2026-11-27
+
+### Changed
+- Hosting page: Recent activity has its own scroll area and fills the rest of the Auto Host panel, newest first (up to 60 lines; the full log stays on the Activity page). Host settings, Last game and Recent kicks scroll separately above it. Folded, they take only the height they need (at most 300 px); while editing, they share the panel 3 : 2 with Recent activity.
+- Bumped the bot and Windows installer to 0.17.4. No hosting behaviour changed. Not compiled in the editing environment; the push-triggered Windows workflow runs the tests.
+
 ## 0.17.3 - 2026-11-27
 
 ### Fixed

@@ -15,47 +15,76 @@ use iced::{
 };
 
 pub fn view(app: &App) -> Element<'_, Message> {
+    // One header row: brand (with the Warcraft III status light), page tabs, drag area,
+    // window controls. Pages get the full window width below it.
+    let color = match app.game {
+        GameState::Stopped => p::ERROR,
+        GameState::Background | GameState::Visible => p::ACCENT,
+        GameState::Multiple => p::GOLD,
+        _ => p::MUTED,
+    };
+    let led = container(space())
+        .width(13)
+        .height(13)
+        .style(move |_| container::Style {
+            background: Some(color.into()),
+            border: Border {
+                color: Color::from_rgb8(13, 19, 17),
+                width: 3.0,
+                radius: 7.0.into(),
+            },
+            shadow: iced::Shadow {
+                color: color.scale_alpha(0.5),
+                blur_radius: 5.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+    let status = tooltip(
+        led,
+        container(text(format!("{} · {}", app.game.label(), app.game.tooltip())).size(13))
+            .padding(10)
+            .style(p::panel),
+        tooltip::Position::Bottom,
+    );
     let brand = effects::skin(
         container(
             row![
-                art::ghost(43.0),
+                art::ghost(32.0),
                 text("GHost Reforged")
                     .font(art::DISPLAY)
                     .color(p::GOLD)
-                    .size(29)
+                    .size(21),
+                status
             ]
-            .spacing(16)
+            .spacing(11)
             .align_y(Alignment::Center),
         )
-        .padding([15, 31])
-        .width(409)
-        .height(94)
+        .padding([0, 16])
+        .height(bg::TAB_HEIGHT)
+        .center_y(bg::TAB_HEIGHT)
         .style(p::panel),
         Frame::Header,
     );
-    let title = mouse_area(container(brand).padding([27, 12]).width(Fill).height(160))
+    let brand = mouse_area(brand)
         .on_press(Message::Window(WindowAction::Drag))
         .on_double_click(Message::Window(WindowAction::Maximize));
-    let header = row![title, super::chrome::controls()]
-        .align_y(Alignment::Start)
-        .height(bg::HEADER);
-    let mut navigation = column![].spacing(8);
+    let mut tabs = row![].spacing(6);
     for (page, name, icon) in [
         (Page::Hosting, "Hosting", Icon::Tower),
         (Page::Profiles, "Profiles", Icon::People),
         (Page::Options, "Options", Icon::Gear),
         (Page::Activity, "Activity", Icon::Scroll),
     ] {
-        navigation = navigation.push(effects::skin(
+        tabs = tabs.push(effects::skin(
             effects::hover(
                 button(
-                    row![art::icon(icon, 39.0), text(name).font(art::LABEL).size(18)]
-                        .spacing(13)
+                    row![art::icon(icon, 26.0), text(name).font(art::LABEL).size(15)]
+                        .spacing(7)
                         .align_y(Alignment::Center),
                 )
-                .padding([12, 21])
-                .height(64)
-                .width(Fill)
+                .padding([0, 11])
+                .height(bg::TAB_HEIGHT)
                 .style(if app.page == page {
                     p::primary
                 } else {
@@ -71,70 +100,34 @@ pub fn view(app: &App) -> Element<'_, Message> {
             },
         ));
     }
-    let color = match app.game {
-        GameState::Stopped => p::ERROR,
-        GameState::Background | GameState::Visible => p::ACCENT,
-        GameState::Multiple => p::GOLD,
-        _ => p::MUTED,
-    };
-    let led = container(space())
-        .width(15)
-        .height(15)
-        .style(move |_| container::Style {
-            background: Some(color.into()),
-            border: Border {
-                color: Color::from_rgb8(13, 19, 17),
-                width: 3.0,
-                radius: 8.0.into(),
-            },
-            shadow: iced::Shadow {
-                color: color.scale_alpha(0.5),
-                blur_radius: 5.0,
+    let drag = mouse_area(container(space()).width(Fill).height(bg::HEADER))
+        .on_press(Message::Window(WindowAction::Drag))
+        .on_double_click(Message::Window(WindowAction::Maximize));
+    let header = row![
+        container(row![brand, tabs].spacing(12).align_y(Alignment::Center))
+            .padding(iced::Padding {
+                top: bg::TAB_TOP,
+                left: bg::LEFT,
                 ..Default::default()
-            },
-            ..Default::default()
-        });
-    let status = tooltip(
-        effects::skin(
-            container(
-                row![led, text(app.game.label()).size(16)]
-                    .spacing(10)
-                    .align_y(Alignment::Center),
-            )
-            .padding([16, 23])
-            .width(Fill)
-            .style(p::panel),
-            Frame::Navigation,
-        ),
-        container(text(app.game.tooltip()).size(13))
-            .padding(10)
-            .style(p::panel),
-        tooltip::Position::Right,
-    );
-    navigation = navigation.push(space().height(Fill)).push(status);
-    let sidebar = container(navigation)
-        .width(bg::SIDEBAR)
-        .height(Fill)
-        .padding(iced::Padding {
-            left: 7.0,
-            right: 7.0,
-            top: 8.0,
-            bottom: 0.0,
-        });
+            }),
+        drag,
+        super::chrome::controls()
+    ]
+    .align_y(Alignment::Start)
+    .height(bg::HEADER);
     let body = match app.page {
         Page::Hosting => super::hosting_view::view(app),
         Page::Profiles => profiles(app),
         Page::Activity => activity(app),
         Page::Options => super::options_view::view(app),
     };
-    let content = row![
-        sidebar,
-        container(effects::slide(body, app.motion.page.value(app.motion.now)))
-            .width(Fill)
-            .height(Fill)
-    ]
-    .spacing(bg::SIDEBAR_GAP)
-    .height(Fill);
+    let content = container(effects::slide(body, app.motion.page.value(app.motion.now)))
+        .padding(iced::Padding {
+            left: bg::LEFT,
+            ..Default::default()
+        })
+        .width(Fill)
+        .height(Fill);
     let foreground = container(column![header, content])
         .padding(iced::Padding {
             right: bg::RIGHT,
