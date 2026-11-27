@@ -7,6 +7,19 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.20.0 - 2026-11-27
+
+### Added
+- **Bring Warcraft III to the front when a game starts** (Play as host, Options; on by default). When the match starts loading, the bot restores the game window if minimised and brings it forward (a tap of Alt lets a background process take the foreground). Retries for up to 5 s while the window appears; Activity logs the result. `end_panel::focus`, `Config::focus_on_start`, profile field `focus_on_start`.
+
+### Fixed
+- **Replay folder `Replays`.** Auto-detection now checks both `Replay` and `Replays`, in `Documents/Warcraft III` and every `BattleNet/<n>` account (`replays::candidates`). The user's replays are in `BattleNet\0\Replays`.
+- **"Checking…" forever on the Last game card.** Lookups still running when the game started were discarded, and the next lobby cleared the last game's levels. Running lookups now finish after the game starts (`DsCheck::game_started`, nothing is kicked or announced), and the last game's levels are kept when the next lobby opens.
+- **Last game card layout.** Each player is one name line plus one detail line ("Lv 804 · 107 matches · Passed") with the Ban button on the right, so names no longer collide with the numbers in the narrow panel. Replay leavers use the same two-line layout. The no-replay fallback lists one "Left early" button per player instead of a sideways strip. Section order: Last game → leavers / replay prompt → Players → ban reason.
+- **Brand ghost cut off.** The header brand has 34 px side padding so the ghost sits inside the frame's ornate ends.
+- Tests: `both_replay_and_replays_folders_are_searched_in_every_account`, `lookups_running_when_the_game_starts_still_report_levels`, `game_rows_read_as_one_short_detail_line`.
+- Bumped the bot and Windows installer to 0.20.0. Not compiled in the editing environment.
+
 ## 0.19.0 - 2026-11-27
 
 ### Changed

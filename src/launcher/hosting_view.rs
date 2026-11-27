@@ -731,59 +731,65 @@ fn stats_table<'a>(
     ban: bool,
 ) -> iced::widget::Column<'a, Message> {
     let (min_level, min_matches) = filter_minimums(app);
-    let mut header = row![
-        muted("Player").width(Fill),
-        muted("Level").width(52),
-        muted("Matches").width(66),
-        muted("Status").width(112),
-    ]
-    .spacing(8);
-    if ban {
-        header = header.push(space().width(78));
-    }
-    let mut table = column![header].spacing(6);
+    let mut table = column![].spacing(8);
     // The host comes first, so a working lookup is visible even with nobody else there.
     let own = app.own_name.clone().filter(|_| app.form.profile.player_host);
     let names: Vec<String> = own.iter().cloned().chain(names.filter(|n| Some(n) != own.as_ref())).collect();
     for name in names {
         let you = own.as_ref() == Some(&name);
-        let (level, matches, status, color) =
-            player_row(&name, app.ds_stats.get(&name).copied(), min_level, min_matches);
-        let (status, color) = if status == "Checking…" && app.ds_failed.contains(&name) {
-            ("Lookup failed", p::GOLD)
-        } else {
-            (status, color)
-        };
-        let status = if you && !matches!(status, "Checking…" | "No BattleTag" | "Lookup failed") {
-            if status == "Not on W3C" { "You · not found" } else { "You" }
-        } else {
-            status
-        };
+        let (detail, color) = player_detail(
+            &name,
+            app.ds_stats.get(&name).copied(),
+            app.ds_failed.contains(&name),
+            min_level,
+            min_matches,
+        );
         let shown = if you { format!("{name} (you)") } else { name.clone() };
+        // Name on one line (never wrapped under the numbers), details underneath.
         let mut line = row![
-            text(shown).size(14).width(Fill),
-            text(level).size(14).width(52),
-            text(matches).size(14).width(66),
-            text(status).size(14).color(color).width(112),
+            column![
+                text(shown)
+                    .size(14)
+                    .wrapping(iced::widget::text::Wrapping::None)
+                    .width(Fill),
+                text(detail).size(13).color(color),
+            ]
+            .spacing(1)
+            .width(Fill)
+            .clip(true)
         ]
         .spacing(8)
         .align_y(Alignment::Center);
-        if ban && you {
-            line = line.push(space().width(78));
-        } else if ban {
+        if ban && !you {
             let banned = app.is_recently_banned(&name);
-            line = line.push(
-                container(action(
-                    if banned { "Banned" } else { "Ban" },
-                    Message::BanLastPlayer(name),
-                    !banned,
-                ))
-                .width(78),
-            );
+            line = line.push(action(
+                if banned { "Banned" } else { "Ban" },
+                Message::BanLastPlayer(name),
+                !banned,
+            ));
         }
         table = table.push(line);
     }
     table
+}
+
+/// "Lv 804 · 107 matches · Passed" and its colour, for one player of a game.
+pub(super) fn player_detail(
+    name: &str,
+    lookup: Option<Option<DsStats>>,
+    failed: bool,
+    min_level: u32,
+    min_matches: u32,
+) -> (String, iced::Color) {
+    let (level, matches, status, color) = player_row(name, lookup, min_level, min_matches);
+    match status {
+        "Checking…" if failed => ("Level lookup failed".into(), p::GOLD),
+        "Checking…" => ("Checking level…".into(), p::MUTED),
+        "No BattleTag" => ("No BattleTag".into(), p::MUTED),
+        "Not on W3C" => ("Not on W3C".into(), color),
+        "Found" => (format!("Lv {level} · {matches} matches"), p::MUTED),
+        _ => (format!("Lv {level} · {matches} matches · {status}"), color),
+    }
 }
 
 /// Everyone in the lobby with their Direct Strike level and filter verdict.
@@ -879,9 +885,8 @@ fn current_game(app: &App) -> Element<'_, Message> {
     else {
         return space().height(0).into();
     };
-    let title = "Last game";
     let reason = effects::skin(
-        text_input("Ban reason (optional)", &app.ban_form_reason)
+        text_input("Reason for Ban buttons (optional)", &app.ban_form_reason)
             .on_input(Message::BanFormReason)
             .padding([6, 12])
             .size(14)
@@ -890,12 +895,13 @@ fn current_game(app: &App) -> Element<'_, Message> {
     );
     let mut section = column![
         row![
-            text(title).size(16).color(p::GOLD).width(Fill),
-            muted(&game.lobby)
+            text("Last game").size(16).color(p::GOLD),
+            muted(&game.lobby).width(Fill),
         ]
+        .spacing(10)
         .align_y(Alignment::Center),
     ]
-    .spacing(6);
+    .spacing(10);
     if let Some(summary) = &game.replay {
         section = section.push(replay_leavers(app, game, summary));
     } else if let Some(seconds) = game.ended_early {
@@ -905,9 +911,9 @@ fn current_game(app: &App) -> Element<'_, Message> {
         section = section.push(replay_folder_prompt());
     }
     section
+        .push(muted("Players"))
         .push(stats_table(app, game.players.iter().cloned(), true))
         .push(reason)
-        .push(muted("Bans are saved to the ban list; banned players are removed with a native ban when they join a later lobby."))
         .into()
 }
 
@@ -934,14 +940,23 @@ fn replay_leavers<'a>(
         let you = own.is_some_and(|own| own.eq_ignore_ascii_case(&leave.name));
         let before_end = clock(summary.length_ms.saturating_sub(leave.at_ms));
         let mut line = row![
-            text(format!("{} left at {} ({before_end} before the end)", leave.name, clock(leave.at_ms)))
-                .size(14)
-                .color(if leave.at_ms < window.limit_ms {
-                    p::ERROR
-                } else {
-                    p::TEXT
-                })
-                .width(Fill)
+            column![
+                text(leave.name.clone())
+                    .size(14)
+                    .wrapping(iced::widget::text::Wrapping::None)
+                    .color(if leave.at_ms < window.limit_ms {
+                        p::ERROR
+                    } else {
+                        p::TEXT
+                    }),
+                muted(format!(
+                    "left at {} · {before_end} before the end",
+                    clock(leave.at_ms)
+                )),
+            ]
+            .spacing(1)
+            .width(Fill)
+            .clip(true)
         ]
         .spacing(8)
         .align_y(Alignment::Center);
@@ -993,34 +1008,36 @@ fn replay_folder_prompt<'a>() -> Element<'a, Message> {
 
 /// After an early end: who left cannot be read from the game, so the host picks them.
 fn early_leavers<'a>(app: &App, game: &'a super::ban_list::LastGame, seconds: u64) -> Element<'a, Message> {
-    let mut buttons = row![].spacing(8);
+    let mut list = column![
+        text(format!(
+            "Match ended early ({}:{:02}): someone left before 7 minutes.",
+            seconds / 60,
+            seconds % 60
+        ))
+        .size(14)
+        .color(p::ERROR),
+        muted("Ban whoever left; the reason is \"Left the game early\"."),
+    ]
+    .spacing(6);
     for name in &game.players {
         let banned = app.is_recently_banned(name);
-        buttons = buttons.push(action(
-            if banned { "Banned" } else { "Left early" },
-            Message::BanEarlyLeaver(name.clone()),
-            !banned,
-        ));
+        list = list.push(
+            row![
+                text(name.clone())
+                    .size(14)
+                    .wrapping(iced::widget::text::Wrapping::None)
+                    .width(Fill),
+                action(
+                    if banned { "Banned" } else { "Left early" },
+                    Message::BanEarlyLeaver(name.clone()),
+                    !banned,
+                ),
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center),
+        );
     }
-    container(
-        column![
-            text(format!(
-                "Match ended early ({}:{:02}): someone left before 7 minutes.",
-                seconds / 60,
-                seconds % 60
-            ))
-            .size(14)
-            .color(p::ERROR),
-            muted("Click whoever left to ban them with the reason \"Left the game early\"."),
-            scrollable(buttons).direction(iced::widget::scrollable::Direction::Horizontal(
-                Default::default()
-            )),
-        ]
-        .spacing(6),
-    )
-    .padding(10)
-    .style(p::panel)
-    .into()
+    container(list).padding(10).style(p::panel).into()
 }
 
 /// "Lv 804 · 107" for a player, coloured by the live DS filter. Empty while unknown.
@@ -1208,6 +1225,15 @@ mod tests {
         let long = "Start Warcraft III before hosting on this installation. Retrying automatically in 60 s… and more text here";
         let short = shorten(long);
         assert!(short.ends_with('…') && short.chars().count() <= STATUS_CHARS);
+    }
+
+    #[test]
+    fn game_rows_read_as_one_short_detail_line() {
+        let found = Some(Some(DsStats { level: 804, matches: 107 }));
+        assert_eq!(player_detail("A#1", found, false, 0, 0).0, "Lv 804 · 107 matches");
+        assert_eq!(player_detail("A#1", found, false, 900, 0).0, "Lv 804 · 107 matches · Below minimum");
+        assert_eq!(player_detail("A#1", None, true, 0, 0).0, "Level lookup failed");
+        assert_eq!(player_detail("A#1", None, false, 0, 0).0, "Checking level…");
     }
 
     #[test]

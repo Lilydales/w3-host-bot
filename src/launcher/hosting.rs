@@ -62,6 +62,7 @@ impl App {
             auto_quit: p.player_host && p.auto_quit,
             auto_quit_delay_seconds: p.auto_quit_delay_seconds,
             leave_if_quit_fails: p.leave_if_quit_fails,
+            focus_on_start: p.player_host && p.focus_on_start,
             ..Config::default()
         };
         self.worker = Some(Worker::start(config)?);
@@ -226,9 +227,16 @@ impl App {
     pub(super) fn record_activity(&mut self, event: Activity) {
         match event {
             Activity::LobbyCreated(name) => {
-                // Keep the host's own stats; they are looked up again for the new lobby.
+                // Keep the host's own stats and the last game's, which its card still shows.
                 let own = self.own_name.clone();
-                self.ds_stats.retain(|player, _| own.as_deref() == Some(player.as_str()));
+                let last: Vec<String> = self
+                    .last_game
+                    .as_ref()
+                    .map(|game| game.players.clone())
+                    .unwrap_or_default();
+                self.ds_stats.retain(|player, _| {
+                    own.as_deref() == Some(player.as_str()) || last.contains(player)
+                });
                 self.log_line(&format!("Lobby created · {name}"), true)
             }
             Activity::GameStarted(name) => {

@@ -58,6 +58,7 @@ pub enum Message {
     ObserverSlots(u8),
     AutoQuit(bool),
     AutoQuitDelay(u64),
+    FocusOnStart(bool),
     Speed(GameSpeed),
     RequireFull(bool),
     MapName,
@@ -426,6 +427,7 @@ impl App {
                     | Message::ObserverSlots(_)
                     | Message::AutoQuit(_)
                     | Message::AutoQuitDelay(_)
+                    | Message::FocusOnStart(_)
                     | Message::Speed(_)
                     | Message::MapName
                     | Message::Browse
@@ -597,6 +599,7 @@ impl App {
             }
             Message::AutoQuit(value) => self.form.profile.auto_quit = value,
             Message::AutoQuitDelay(value) => self.form.profile.auto_quit_delay_seconds = value.min(60),
+            Message::FocusOnStart(value) => self.form.profile.focus_on_start = value,
             Message::Speed(value) => {
                 self.form.profile.speed = value;
                 self.motion.close_menus();

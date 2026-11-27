@@ -192,6 +192,35 @@ mod native {
         Ok((window, w, h))
     }
 
+    /// Brings the game window to the front. A tap of Alt first lets a background process
+    /// take the foreground, which Windows otherwise refuses.
+    pub fn focus(pid: u32) -> Result<bool, String> {
+        use windows_sys::Win32::UI::{
+            Input::KeyboardAndMouse::{INPUT_KEYBOARD, KEYEVENTF_KEYUP, VK_MENU},
+            WindowsAndMessaging::{GetForegroundWindow, IsIconic, SW_RESTORE, ShowWindow},
+        };
+        let (window, _, _) = window(pid)?;
+        unsafe {
+            if GetForegroundWindow() == window {
+                return Ok(false);
+            }
+            if IsIconic(window) != 0 {
+                ShowWindow(window, SW_RESTORE);
+            }
+            let mut keys: [INPUT; 2] = zeroed();
+            for (input, flags) in keys.iter_mut().zip([0, KEYEVENTF_KEYUP]) {
+                input.r#type = INPUT_KEYBOARD;
+                input.Anonymous.ki.wVk = VK_MENU;
+                input.Anonymous.ki.dwFlags = flags;
+            }
+            SendInput(2, keys.as_ptr(), size_of::<INPUT>() as i32);
+            if SetForegroundWindow(window) == 0 {
+                return Err("Windows did not allow bringing the game to the front.".into());
+            }
+        }
+        Ok(true)
+    }
+
     /// Posts a click to the window without touching the user's mouse.
     pub fn post_click(pid: u32) -> Result<(), String> {
         let (window, w, h) = window(pid)?;
@@ -235,7 +264,12 @@ mod native {
 }
 
 #[cfg(windows)]
-pub use native::{input_click, post_click};
+pub use native::{focus, input_click, post_click};
+
+#[cfg(not(windows))]
+pub fn focus(_: u32) -> Result<bool, String> {
+    Err("Focusing the game requires Windows.".into())
+}
 
 #[cfg(not(windows))]
 pub fn post_click(_: u32) -> Result<(), String> {

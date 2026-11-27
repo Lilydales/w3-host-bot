@@ -28,16 +28,25 @@ pub enum ReplayError {
     Unreadable(String),
 }
 
+/// Replay folder names used by different Warcraft III versions.
+const FOLDERS: [&str; 2] = ["Replay", "Replays"];
+
+/// Every place a `LastReplay.w3g` can be, under `Documents/Warcraft III`.
+pub fn candidates(root: &Path) -> Vec<PathBuf> {
+    let mut bases = vec![root.to_path_buf()];
+    if let Ok(accounts) = std::fs::read_dir(root.join("BattleNet")) {
+        bases.extend(accounts.flatten().map(|account| account.path()));
+    }
+    bases
+        .into_iter()
+        .flat_map(|base| FOLDERS.map(|folder| base.join(folder).join(FILE_NAME)))
+        .collect()
+}
+
 /// Newest `LastReplay.w3g` under the standard Warcraft III folders.
 pub fn auto_find() -> Option<PathBuf> {
     let root = super::maps::documents_directory()?.join("Warcraft III");
-    let mut candidates = vec![root.join("Replay").join(FILE_NAME)];
-    if let Ok(accounts) = std::fs::read_dir(root.join("BattleNet")) {
-        for account in accounts.flatten() {
-            candidates.push(account.path().join("Replay").join(FILE_NAME));
-        }
-    }
-    candidates
+    candidates(&root)
         .into_iter()
         .filter_map(|path| Some((std::fs::metadata(&path).ok()?.modified().ok()?, path)))
         .max_by_key(|(modified, _)| *modified)
@@ -217,7 +226,7 @@ impl App {
     pub(super) fn replay_folder_label(&self) -> String {
         match &self.replay_folder {
             Some(folder) => folder.display().to_string(),
-            None => "found automatically (Documents\\Warcraft III\\BattleNet\\…\\Replay)".into(),
+            None => "found automatically (Documents\\Warcraft III\\BattleNet\\…\\Replays)".into(),
         }
     }
 
@@ -495,6 +504,16 @@ mod tests {
         assert!(app.last_game.as_ref().unwrap().auto_banned.is_empty());
         let list = ghost_reforged::bans::BanList::open(Some(&app.ban_file));
         assert!(!list.is_banned("Early#2"));
+    }
+
+    #[test]
+    fn both_replay_and_replays_folders_are_searched_in_every_account() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(root.path().join("BattleNet/0/Replays")).unwrap();
+        let found = candidates(root.path());
+        assert!(found.contains(&root.path().join("BattleNet/0/Replays").join(FILE_NAME)));
+        assert!(found.contains(&root.path().join("BattleNet/0/Replay").join(FILE_NAME)));
+        assert!(found.contains(&root.path().join("Replay").join(FILE_NAME)));
     }
 
     #[test]

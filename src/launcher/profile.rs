@@ -67,6 +67,9 @@ pub struct Profile {
     /// already decided), unless it is also before `early_leave_minutes`.
     #[serde(default = "end_buffer_minutes")]
     pub end_buffer_minutes: u32,
+    /// Play as host: bring Warcraft III to the front when a game starts.
+    #[serde(default = "private_by_default")]
+    pub focus_on_start: bool,
 }
 
 pub const MAX_EARLY_LEAVE_MINUTES: u32 = 30;
@@ -184,6 +187,7 @@ impl Default for Profile {
             early_leave_rule: EarlyLeaveRule::default(),
             early_leave_minutes: early_leave_minutes(),
             end_buffer_minutes: end_buffer_minutes(),
+            focus_on_start: true,
         }
     }
 }

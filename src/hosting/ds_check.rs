@@ -167,6 +167,16 @@ impl DsCheck {
         while self.results.try_recv().is_ok() {}
     }
 
+    /// A game started: nothing is kicked or announced any more, but lookups still running
+    /// are kept so the Current/Last game panels get their levels.
+    pub fn game_started(&mut self) {
+        self.messages.clear();
+        self.kicks.clear();
+        self.reasons.clear();
+        self.verdicts.clear();
+        self.last_sent = None;
+    }
+
     /// Collects finished lookups. Never blocks.
     pub fn poll(
         &mut self,
@@ -443,6 +453,22 @@ mod tests {
         check.refilter(&Config::default(), 7, &events);
         assert!(check.kicks.is_empty() && check.reasons.is_empty());
         assert!(received.try_iter().count() >= 1);
+    }
+
+    #[test]
+    fn lookups_running_when_the_game_starts_still_report_levels() {
+        let mut check = DsCheck::default();
+        let (events, received) = mpsc::channel();
+        check.pending.insert("Late#1".into());
+        check.kicks.push_back(("Old#2".into(), 0));
+        check.game_started();
+        assert!(check.kicks.is_empty() && check.pending.contains("Late#1"));
+        check
+            .sender
+            .send(("Late#1".into(), Lookup::Found(ds_report::DsStats { level: 9, matches: 40 })))
+            .unwrap();
+        check.poll(&Config::default(), 1, &events, &mut Announcements::default());
+        assert!(received.try_iter().any(|e| matches!(e, Event::DsStats(n, Some(_)) if n == "Late#1")));
     }
 
     #[test]

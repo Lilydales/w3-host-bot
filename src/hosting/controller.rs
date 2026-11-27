@@ -71,6 +71,7 @@ pub(super) fn run(
     let mut observer_trim = slots::ObserverTrim::default();
     let mut ds = super::ds_check::DsCheck::default();
     let mut end_watch = super::end_watch::EndWatch::default();
+    let mut focused_game = false;
     loop {
         let step = supervision::attempt(|| -> Result<Step, String> {
             let game = resources
@@ -232,6 +233,38 @@ pub(super) fn run(
                 ds.kick(&engine, &mut manual_kick, now);
             }
             commands.extend(end_watch.step(&engine, game.pid(), now, tx));
+            // Player mode: bring the game forward once per match, as it starts loading.
+            if engine.phase != Phase::InGame {
+                focused_game = false;
+            } else if !focused_game
+                && engine.config.host_mode == crate::config::HostMode::Player
+                && engine.config.focus_on_start
+            {
+                focused_game = true;
+                let (pid, events) = (game.pid(), tx.clone());
+                let _ = std::thread::Builder::new()
+                    .name("ghost-focus".into())
+                    .spawn(move || {
+                        // The window can appear a moment after loading begins.
+                        for attempt in 0..10 {
+                            match crate::end_panel::focus(pid) {
+                                Ok(true) => {
+                                    let _ = events.send(Event::Activity(Activity::Command(
+                                        "Game started · Warcraft III brought to the front".into(),
+                                    )));
+                                    return;
+                                }
+                                Ok(false) => return,
+                                Err(error) if attempt == 9 => {
+                                    let _ = events.send(Event::Activity(Activity::Command(format!(
+                                        "Game started · could not bring Warcraft III to the front · {error}"
+                                    ))));
+                                }
+                                Err(_) => std::thread::sleep(Duration::from_millis(500)),
+                            }
+                        }
+                    });
+            }
             if let Some(Control::EditSlot(request)) = &control {
                 slot_edit.request(request.clone(), &engine, now);
             }
@@ -330,8 +363,13 @@ pub(super) fn run(
                         ds.left(name);
                         false
                     }
-                    Activity::LobbyCreated(_) | Activity::GameStarted(_) => {
+                    Activity::LobbyCreated(_) => {
                         ds.reset();
+                        false
+                    }
+                    Activity::GameStarted(_) => {
+                        // Lookups still running finish, so the game's players show levels.
+                        ds.game_started();
                         false
                     }
                     Activity::Command(_) => false,

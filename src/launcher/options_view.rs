@@ -66,6 +66,11 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
                 if profile.player_host {
                     Element::from(column![
                         observer_stepper(profile.observer_slots),
+                        toggler(profile.focus_on_start)
+                            .label("Bring Warcraft III to the front when a game starts")
+                            .size(21)
+                            .text_size(14)
+                            .on_toggle(Message::FocusOnStart),
                         toggler(profile.auto_quit)
                             .label("Exit the game when the Direct Strike end panel appears")
                             .size(21)

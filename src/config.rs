@@ -69,6 +69,8 @@ pub struct Config {
     pub auto_quit_delay_seconds: u64,
     /// If Quit cannot be pressed, leave the game instead (may be recorded as a leave).
     pub leave_if_quit_fails: bool,
+    /// Player mode: bring the game window to the front when a match starts loading.
+    pub focus_on_start: bool,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
@@ -183,6 +185,7 @@ impl Default for Config {
             auto_quit: false,
             auto_quit_delay_seconds: 5,
             leave_if_quit_fails: false,
+            focus_on_start: false,
         }
     }
 }

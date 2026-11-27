@@ -60,7 +60,8 @@ pub fn view(app: &App) -> Element<'_, Message> {
             .spacing(11)
             .align_y(Alignment::Center),
         )
-        .padding([0, 16])
+        // The header frame's ornate ends are about 30 px wide; keep the ghost inside them.
+        .padding([0, 34])
         .height(bg::TAB_HEIGHT)
         .center_y(bg::TAB_HEIGHT)
         .style(p::panel),
