@@ -43,6 +43,9 @@ mod tests;
 pub enum Control {
     Stop,
     Start,
+    /// Leave the running match now ("Leave game" button). The usual end-of-match
+    /// handling then counts it, reads the replay and hosts the next lobby.
+    LeaveGame,
     StartRule { minimum: u8, full: bool },
     Settings(LiveSettings),
     Slot { slot: u8, open: bool },

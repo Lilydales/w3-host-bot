@@ -109,6 +109,15 @@ pub enum Message {
     BattleNetObserved(ghost_reforged::battlenet::State),
     /// Bring up (or start) the Battle.net app so the user can sign in.
     OpenBattleNet,
+    /// Leave the running match and host the next lobby (click twice to confirm).
+    LeaveGame,
+    /// Close Warcraft III (stops hosting first; click twice during a match).
+    ExitGame,
+    GameExited(Result<String, String>),
+    /// Status bar: Stop Hosting also closes Warcraft III.
+    ExitOnStop(bool),
+    /// Options: bring the launcher back after Battle.net starts the game.
+    RefocusAfterLaunch(bool),
     ClearLog,
 }
 
@@ -262,6 +271,16 @@ pub struct App {
     probing: bool,
     pub(super) settings_due: Option<Instant>,
     pub(super) started: Instant,
+    /// First click on Leave game / Exit Warcraft III during a match; a second click
+    /// within `game_controls::CONFIRM` confirms.
+    pub(super) leave_armed: Option<Instant>,
+    pub(super) exit_armed: Option<Instant>,
+    /// Close the game once hosting has stopped.
+    pub(super) exit_after_stop: bool,
+    /// Warcraft III is being closed.
+    pub(super) exiting_game: bool,
+    /// Bringing the launcher back after a game launch.
+    pub(super) refocus: Option<super::game_controls::Refocus>,
 }
 
 impl App {
@@ -326,6 +345,11 @@ impl App {
             probing: false,
             settings_due: None,
             started: Instant::now(),
+            leave_armed: None,
+            exit_armed: None,
+            exit_after_stop: false,
+            exiting_game: false,
+            refocus: None,
         };
         // Nothing to fill in: start with the settings folded away.
         app.settings_open = !app.settings_complete();
@@ -388,6 +412,9 @@ impl App {
             return task;
         }
         if let Some(task) = self.replay_message(&message) {
+            return task;
+        }
+        if let Some(task) = self.game_message(&message) {
             return task;
         }
         if let Message::Tray(event) = message {
@@ -488,6 +515,7 @@ impl App {
                 let result = self.start_hosting();
                 if result.is_ok() {
                     self.settings_open = false;
+                    self.start_refocus();
                 }
                 self.notify(result, "");
             }
@@ -559,6 +587,9 @@ impl App {
                 self.poll_host();
                 if !self.hidden {
                     self.preview.poll();
+                }
+                if let Some(task) = self.exit_after_stop_task() {
+                    return task;
                 }
                 if self.worker.is_none() && self.updates.ready.is_some() {
                     return self.install_ready();
@@ -729,6 +760,16 @@ impl App {
                     if self.game != game.state {
                         self.preview.request();
                     }
+                }
+                // The game closed while hosting: the bot will start it again through
+                // Battle.net, so bring the launcher back afterwards too.
+                if self.worker.is_some()
+                    && super::game_controls::game_running(self.game)
+                    && game.state == GameState::Stopped
+                    && !self.exiting_game
+                {
+                    self.game = game.state;
+                    self.start_refocus();
                 }
                 self.game = game.state;
             }

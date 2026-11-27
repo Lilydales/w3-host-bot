@@ -11,6 +11,7 @@ mod chrome;
 mod desktop;
 mod effects;
 mod frame_art;
+mod game_controls;
 mod hosting;
 mod hosting_view;
 mod journal;

@@ -17,6 +17,9 @@ Add new ideas at the bottom of the right section. Keep each item short: what, wh
 - **Allow players not found on W3C** even when the DS filter is on (option), so a broken ds-report lookup cannot empty lobbies.
 - **Ban list manager**: list, search and unban from the Options page (today: edit `bans.json`).
 - **Keep "Last game" across launcher restarts** (currently in memory only).
+- **Close-button choice** (from W3Champions): first time the window is closed, ask "Minimise to tray or quit?" with "remember my choice"; warn "You are in an active game" before quitting mid-match.
+- **Close Battle.net and Warcraft III** together (W3Champions has this action), e.g. as an option on Exit W3.
+- **Game session line** (from W3Champions' "Game Session: Lobby / Loading / Running / Ended"): one short state chip in the status bar instead of mixed status text.
 - **Auto-login**: declined for now (plain-text password risk; Battle.net login is a web page). If revisited: Windows Credential Manager, and a protocol log of a real sign-in first.
 
 ## Maintenance

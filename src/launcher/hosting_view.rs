@@ -71,14 +71,26 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
         row![action("Host", Message::Host, editable)]
     } else {
         let stopping = app.hosting_status == "Stopping…";
-        row![
+        // One contextual button, like W3Champions' single Play/Cancel button: Force
+        // start in the lobby, Leave game during a match.
+        let first = if app.in_game {
+            action(
+                if super::game_controls::armed(app.leave_armed) {
+                    "Confirm leave"
+                } else {
+                    "Leave game"
+                },
+                Message::LeaveGame,
+                !stopping,
+            )
+        } else {
             action(
                 "Force start",
                 Message::Start,
-                !stopping && app.lobby.as_ref().is_some_and(|l| l.can_start)
-            ),
-            action("Stop Hosting", Message::Stop, !stopping)
-        ]
+                !stopping && app.lobby.as_ref().is_some_and(|l| l.can_start),
+            )
+        };
+        row![first, action("Stop Hosting", Message::Stop, !stopping)]
     }
     .spacing(12);
     let settings: Element<'_, Message> = if app.settings_open {
@@ -309,9 +321,12 @@ fn status_bar<'a>(app: &'a App, controls: iced::widget::Row<'a, Message>) -> Ele
         .on_press(Message::TogglePreview),
         true,
     );
+    let side = column![preview, game_tools(app)]
+        .spacing(4)
+        .align_x(Alignment::End);
     effects::frame(
         container(
-            row![container(info).width(Fill).clip(true), preview, controls.spacing(12)]
+            row![container(info).width(Fill).clip(true), side, controls.spacing(12)]
                 .spacing(14)
                 .align_y(Alignment::Center),
         )
@@ -321,6 +336,36 @@ fn status_bar<'a>(app: &'a App, controls: iced::widget::Row<'a, Message>) -> Ele
         .center_y(bg::STATUS_HEIGHT)
         .style(p::panel),
     )
+}
+
+/// Small game tools under the Game view button: "Stop also exits W3" (live, saved
+/// with the profile) and Exit W3 while the game runs (click twice during a match).
+fn game_tools(app: &App) -> Element<'_, Message> {
+    use super::game_controls::{armed, game_running};
+    let mut tools = row![
+        iced::widget::toggler(app.form.profile.exit_game_on_stop)
+            .label("Stop also exits W3")
+            .size(16)
+            .text_size(13)
+            .on_toggle(Message::ExitOnStop)
+    ]
+    .spacing(10)
+    .align_y(Alignment::Center);
+    if game_running(app.game) || app.exiting_game {
+        let caption = if app.exiting_game {
+            "Closing W3…"
+        } else if armed(app.exit_armed) {
+            "Click again to exit ▸"
+        } else {
+            "Exit W3 ▸"
+        };
+        let link = button(text(caption).size(13).color(p::GOLD))
+            .padding([0, 4])
+            .style(p::inset)
+            .on_press_maybe((!app.exiting_game).then_some(Message::ExitGame));
+        tools = tools.push(effects::hover(link, !app.exiting_game));
+    }
+    tools.into()
 }
 
 fn lobby(app: &App) -> Element<'_, Message> {

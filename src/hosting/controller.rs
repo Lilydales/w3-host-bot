@@ -177,6 +177,15 @@ pub(super) fn run(
                     let _ = tx.send(Event::Activity(Activity::Command(line)));
                 }
             }
+            if matches!(control, Some(Control::LeaveGame)) {
+                let line = if matches!(engine.phase, Phase::InGame | Phase::WatchingGame) {
+                    commands.push(Command::empty("LeaveGame"));
+                    "Leave game · leaving the match now"
+                } else {
+                    "Leave game · no match is running"
+                };
+                let _ = tx.send(Event::Activity(Activity::Command(line.into())));
+            }
             if let Some(Control::Kick(target)) = &control {
                 manual_kick.request(target.clone(), &engine, now);
             }

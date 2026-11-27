@@ -70,6 +70,12 @@ pub struct Profile {
     /// Play as host: bring Warcraft III to the front when a game starts.
     #[serde(default = "private_by_default")]
     pub focus_on_start: bool,
+    /// Bring GHost Reforged back to the front after Battle.net starts the game for it.
+    #[serde(default = "private_by_default")]
+    pub refocus_after_launch: bool,
+    /// Stop Hosting also closes Warcraft III. Changeable at any time from the status bar.
+    #[serde(default)]
+    pub exit_game_on_stop: bool,
 }
 
 pub const MAX_EARLY_LEAVE_MINUTES: u32 = 30;
@@ -188,6 +194,8 @@ impl Default for Profile {
             early_leave_minutes: early_leave_minutes(),
             end_buffer_minutes: end_buffer_minutes(),
             focus_on_start: true,
+            refocus_after_launch: true,
+            exit_game_on_stop: false,
         }
     }
 }

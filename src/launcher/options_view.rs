@@ -71,6 +71,11 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
                             .size(21)
                             .text_size(14)
                             .on_toggle(Message::FocusOnStart),
+                        toggler(profile.refocus_after_launch)
+                            .label("Bring GHost back to the front after Battle.net starts the game")
+                            .size(21)
+                            .text_size(14)
+                            .on_toggle(Message::RefocusAfterLaunch),
                         toggler(profile.auto_quit)
                             .label("Exit the game when the Direct Strike end panel appears")
                             .size(21)

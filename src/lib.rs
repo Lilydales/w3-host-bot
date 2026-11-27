@@ -6,6 +6,7 @@ pub mod diagnostics;
 pub mod discovery;
 pub mod ds_report;
 pub mod end_panel;
+pub mod game_control;
 pub mod engine;
 pub mod hosting;
 pub mod protocol;

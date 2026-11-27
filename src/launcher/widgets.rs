@@ -63,6 +63,7 @@ pub fn optional_action(name: &'static str, message: Option<Message>) -> Element<
         "Save profile" => Some(Icon::Save),
         "Host" => Some(Icon::Play),
         "Force start" => Some(Icon::Swords),
+        "Leave game" | "Confirm leave" => Some(Icon::Power),
         _ => None,
     };
     let mut content = row![].spacing(7).align_y(Alignment::Center);
@@ -70,7 +71,10 @@ pub fn optional_action(name: &'static str, message: Option<Message>) -> Element<
         content = content.push(art::icon(icon, 27.0));
     }
     content = content.push(text(name).size(16));
-    let primary = matches!(name, "Host" | "Force start" | "Stop Hosting");
+    let primary = matches!(
+        name,
+        "Host" | "Force start" | "Stop Hosting" | "Leave game" | "Confirm leave"
+    );
     effects::skin(
         effects::hover(
             button(content)

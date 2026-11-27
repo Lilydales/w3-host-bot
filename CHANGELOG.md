@@ -7,6 +7,19 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.22.0 - 2026-11-28
+
+### Added
+- **Bring GHost back to the front after Battle.net starts the game** (Play as host, Options; on by default). After Host, and when hosting restarts a closed game, a watcher brings the GHost Reforged window back whenever Battle.net or the new Warcraft III window takes the foreground. It stops 25 s after the game process appears, after 6 refocuses, or after 2 minutes; does nothing if the game was already running, if the launcher is minimised or in the tray, or if you switch to any other program. Activity: "Game launched · GHost Reforged brought back to the front". (`src/game_control.rs`, `reclaim_focus_after_launch`; profile field `refocus_after_launch`.) The W3Champions launcher does the same (refocuses its window after launch actions).
+- **Exit W3 ▸** link in the status bar (under Game view), shown while Warcraft III runs. Asks the game to close (WM_CLOSE), waits 6 s, then ends the process. If hosting is running it stops hosting first (otherwise the bot would start the game again). During a match it needs a second click within 5 s ("Click again to exit ▸"). `game_control::exit_game`, `Message::ExitGame`.
+- **Leave game** button: during a match the Force start button becomes Leave game (click twice within 5 s: "Confirm leave"). Sends `LeaveGame`; the normal end-of-match handling then counts the match, reads the replay and hosts the next lobby (if "Host the next lobby after each match" is on). Leaving early may count as a leave on W3C/FLO. `Control::LeaveGame`.
+- **"Stop also exits W3"** live switch in the status bar. When on, Stop Hosting closes Warcraft III once hosting has stopped. Saved with the profile immediately (`exit_game_on_stop`, off by default).
+
+### Changed
+- Status bar layout, borrowing from the W3Champions launcher: one contextual main button (Force start in the lobby → Leave game in a match), game tools grouped under Game view.
+- Tests: `focus_is_reclaimed_only_from_battlenet_or_the_new_game_window`, `reclaiming_stops_after_the_launch_settles_or_the_limit`, `a_confirmation_click_expires`, `exit_is_offered_only_while_the_game_runs`.
+- Bumped the bot and Windows installer to 0.22.0. Not compiled in the editing environment.
+
 ## 0.21.0 - 2026-11-27
 
 ### Added
