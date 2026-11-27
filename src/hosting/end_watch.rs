@@ -1,10 +1,13 @@
-//! Player mode: watches the game window for Direct Strike's end panel and presses its Quit
-//! button, so the results screen appears and the bot can host the next lobby.
+//! Player mode, Direct Strike maps only: watches the game window for the map's end panel
+//! (VICTORY/DEFEAT with Quit) and exits the game, so the bot can host the next lobby.
+//!
+//! Clicking the map's Quit button turned out to be unreliable, so the bot leaves the game
+//! the same way the observer host does (`LeaveGame`). Leaving skips the map's own Quit
+//! handler, so W3C/FLO may record the result as a leave.
 //!
 //! Captures run on a short-lived thread every two seconds, only while a match is running.
-//! Order of attempts once the panel has been seen twice in a row and the delay has passed:
-//! a posted click (mouse untouched), then a real click 4 s later, then, only when enabled,
-//! leaving the game 15 s later. Leaving skips the map's Quit, so the result may count as a leave.
+//! Once the panel has been seen twice in a row and the delay has passed, the bot leaves;
+//! if the game is still running 15 s later it tries once more.
 use super::{Activity, Event};
 use crate::{
     config::{Config, HostMode},
@@ -15,8 +18,7 @@ use crate::{
 use std::sync::mpsc::{self, Receiver, Sender};
 
 const INTERVAL: u64 = 2;
-const REAL_CLICK_AFTER: u64 = 4;
-const LEAVE_AFTER: u64 = 15;
+const RETRY_AFTER: u64 = 15;
 
 #[derive(Default)]
 pub(super) struct EndWatch {
@@ -24,9 +26,8 @@ pub(super) struct EndWatch {
     last_capture: Option<u64>,
     hits: u8,
     seen_at: Option<u64>,
-    clicked_at: Option<u64>,
-    real_click: bool,
-    left: bool,
+    left_at: Option<u64>,
+    retried: bool,
     reported_error: bool,
 }
 
@@ -34,14 +35,15 @@ pub(super) struct EndWatch {
 #[derive(Debug, PartialEq)]
 pub(super) enum Action {
     Wait,
-    PostClick,
-    RealClick,
     Leave,
 }
 
 impl EndWatch {
     fn active(config: &Config, engine: &Engine) -> bool {
-        config.host_mode == HostMode::Player && config.auto_quit && engine.phase == Phase::InGame
+        config.host_mode == HostMode::Player
+            && config.auto_quit
+            && config.is_direct_strike()
+            && engine.phase == Phase::InGame
     }
 
     /// Records one capture result and decides what to do.
@@ -61,17 +63,13 @@ impl EndWatch {
         if now < seen + config.auto_quit_delay_seconds {
             return Action::Wait;
         }
-        match self.clicked_at {
+        match self.left_at {
             None => {
-                self.clicked_at = Some(now);
-                Action::PostClick
+                self.left_at = Some(now);
+                Action::Leave
             }
-            Some(at) if !self.real_click && now >= at + REAL_CLICK_AFTER => {
-                self.real_click = true;
-                Action::RealClick
-            }
-            Some(at) if config.leave_if_quit_fails && !self.left && now >= at + LEAVE_AFTER => {
-                self.left = true;
+            Some(at) if !self.retried && now >= at + RETRY_AFTER => {
+                self.retried = true;
                 Action::Leave
             }
             _ => Action::Wait,
@@ -111,20 +109,12 @@ impl EndWatch {
             }
             match self.decide(&engine.config, visible, now) {
                 Action::Wait => {}
-                Action::PostClick => {
-                    note("End panel · clicking Quit".into());
-                    if let Err(error) = end_panel::post_click(pid) {
-                        note(format!("End panel · click failed · {error}"));
-                    }
-                }
-                Action::RealClick => {
-                    note("End panel still open · clicking Quit with the mouse".into());
-                    if let Err(error) = end_panel::input_click(pid) {
-                        note(format!("End panel · click failed · {error}"));
-                    }
-                }
                 Action::Leave => {
-                    note("End panel still open · leaving the game (may count as a leave)".into());
+                    note(if self.retried {
+                        "End panel still open · exiting the game again".into()
+                    } else {
+                        "End panel · exiting the game".into()
+                    });
                     return Some(Command::empty("LeaveGame"));
                 }
             }
@@ -154,8 +144,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn quit_is_clicked_after_two_sightings_and_the_delay_then_retried_then_left_only_if_enabled() {
-        let mut config = Config {
+    fn the_game_is_left_after_two_sightings_and_the_delay_then_retried_once() {
+        let config = Config {
             auto_quit_delay_seconds: 5,
             ..Config::default()
         };
@@ -163,15 +153,26 @@ mod tests {
         assert_eq!(watch.decide(&config, true, 10), Action::Wait, "one sighting is not enough");
         assert_eq!(watch.decide(&config, true, 12), Action::Wait, "delay starts now");
         assert_eq!(watch.decide(&config, true, 16), Action::Wait);
-        assert_eq!(watch.decide(&config, true, 17), Action::PostClick);
-        assert_eq!(watch.decide(&config, true, 19), Action::Wait);
-        assert_eq!(watch.decide(&config, true, 21), Action::RealClick);
-        assert_eq!(watch.decide(&config, true, 40), Action::Wait, "leaving is off by default");
-        config.leave_if_quit_fails = true;
-        assert_eq!(watch.decide(&config, true, 41), Action::Leave);
-        assert_eq!(watch.decide(&config, true, 50), Action::Wait, "only once");
+        assert_eq!(watch.decide(&config, true, 17), Action::Leave);
+        assert_eq!(watch.decide(&config, true, 25), Action::Wait);
+        assert_eq!(watch.decide(&config, true, 32), Action::Leave, "one retry");
+        assert_eq!(watch.decide(&config, true, 60), Action::Wait, "only once");
         // The panel closing resets everything.
-        assert_eq!(watch.decide(&config, false, 52), Action::Wait);
-        assert_eq!(watch.decide(&config, true, 54), Action::Wait);
+        assert_eq!(watch.decide(&config, false, 62), Action::Wait);
+        assert_eq!(watch.decide(&config, true, 64), Action::Wait);
+    }
+
+    #[test]
+    fn only_direct_strike_maps_are_watched() {
+        use std::path::PathBuf;
+        let map = |name: &str| Config {
+            maps: vec![PathBuf::from(format!(r"C:\Maps\{name}"))],
+            ..Config::default()
+        };
+        assert!(map("5335_Direct Strike 6.5.13f.w3x").is_direct_strike());
+        assert!(map("DirectStrike_7.w3x").is_direct_strike());
+        assert!(map("direct_strike.w3m").is_direct_strike());
+        assert!(!map("Legion TD.w3x").is_direct_strike());
+        assert!(!Config::default().is_direct_strike());
     }
 }

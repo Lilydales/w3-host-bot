@@ -67,20 +67,16 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
                     Element::from(column![
                         observer_stepper(profile.observer_slots),
                         toggler(profile.auto_quit)
-                            .label("Press Quit on the Direct Strike end panel")
+                            .label("Exit the game when the Direct Strike end panel appears")
                             .size(21)
                             .text_size(14)
                             .on_toggle(Message::AutoQuit),
                         delay_stepper(profile.auto_quit_delay_seconds),
-                        toggler(profile.leave_if_quit_fails)
-                            .label("If Quit cannot be pressed, leave the game (may count as a leave)")
-                            .size(21)
-                            .text_size(14)
-                            .on_toggle(Message::LeaveIfQuitFails),
                         muted(
-                            "The bot watches the game window for the VICTORY/DEFEAT panel and clicks \
-                             its Quit button, so the result is recorded normally and the next lobby \
-                             is hosted. Your mouse may move briefly if the first click is ignored."
+                            "Direct Strike maps only. The bot watches the game window for the \
+                             VICTORY/DEFEAT panel, waits the time above, then leaves the game and \
+                             hosts the next lobby. Leaving skips the map's Quit button, so W3C may \
+                             record it as a leave."
                         ),
                     ]
                     .spacing(12))
@@ -149,7 +145,7 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
         rule::horizontal(1),
         text("Direct Strike filter").size(20),
         muted(
-            "Players with a BattleTag are looked up on ds-report.com when they join. \
+            "Direct Strike maps only. Players with a BattleTag are looked up on ds-report.com when they join. \
              Players who are not found, or are below a minimum, are kicked (never banned). \
              0 turns a minimum off. The minimums apply immediately, also while hosting \
              (they are on the Hosting page too); the patch version applies when hosting starts."
@@ -229,7 +225,7 @@ fn delay_stepper<'a>(seconds: u64) -> Element<'a, Message> {
         super::widgets::action("−", Message::AutoQuitDelay(seconds.saturating_sub(5)), seconds > 0),
         text(format!("{seconds} s")).size(16).width(44).center(),
         super::widgets::action("+", Message::AutoQuitDelay((seconds + 5).min(60)), seconds < 60),
-        muted("Wait before pressing Quit"),
+        muted("Wait before exiting"),
     ]
     .spacing(9)
     .align_y(Alignment::Center)

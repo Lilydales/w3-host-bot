@@ -7,6 +7,15 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.19.0 - 2026-11-27
+
+### Changed
+- **Auto-exit instead of clicking Quit.** When the Direct Strike end panel (VICTORY/DEFEAT) appears, the bot now leaves the game (`LeaveGame`) after the delay, instead of clicking the map's Quit button, which did not always end the match. If the game is still running 15 s later it tries once more. Leaving skips the map's Quit handler, so W3C/FLO may record it as a leave. Options: "Exit the game when the Direct Strike end panel appears" + delay; the old "If Quit cannot be pressed, leave the game" toggle is removed (its profile field is kept so saved profiles still load).
+- Leaving a running player-host match straight to a menu (no results screen) now counts the match, reads its replay and rehosts, the same as a results screen.
+- **Direct Strike only.** These features now apply only when the map file name contains "Direct Strike" (`config::is_direct_strike_map`, ignoring spaces, `_` and case): the end-panel auto-exit, ds-report lookups / level filter / stats announcements (including your own), and automatic early-leave bans. For other maps the welcome message works as before, early leavers are still listed with a Ban button, and the folded Host settings show "Map type: Other (DS features off)".
+- Tests: `the_game_is_left_after_two_sightings_and_the_delay_then_retried_once`, `only_direct_strike_maps_are_watched`, `leaving_a_player_match_straight_to_a_menu_counts_it_and_rehosts`, `other_maps_only_list_early_leavers`; settings-grid and replay tests updated.
+- Bumped the bot and Windows installer to 0.19.0. Built on 0.18.4; not compiled in the editing environment.
+
 ## 0.18.4 - 2026-11-27
 
 ### Fixed

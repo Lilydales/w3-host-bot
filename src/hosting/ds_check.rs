@@ -87,7 +87,8 @@ impl DsCheck {
     /// Starts a lookup for a joining guest. Returns `false` when the player is not checked
     /// (no BattleTag, the host, or no room for another lookup), so the normal welcome applies.
     pub fn join(&mut self, config: &Config, lobby: Option<&Lobby>, name: &str) -> bool {
-        if !name.contains('#')
+        // ds-report only knows Direct Strike; other maps get the ordinary welcome.
+        if !config.is_direct_strike() || !name.contains('#')
             || lobby.is_some_and(|l| l.players.iter().any(|p| p.is_self && p.name == name))
         {
             return false;
@@ -122,7 +123,7 @@ impl DsCheck {
     /// Looks up the host's own stats once per lobby, so the launcher can show them and the
     /// host can see the lookup works. The answer is never used to kick or announce.
     pub fn lookup_self(&mut self, config: &Config, name: &str) {
-        if !name.contains('#') || self.own.as_deref() == Some(name) {
+        if !config.is_direct_strike() || !name.contains('#') || self.own.as_deref() == Some(name) {
             return;
         }
         let (sender, notes, tag, patch) = (

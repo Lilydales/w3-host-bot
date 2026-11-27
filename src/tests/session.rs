@@ -404,3 +404,19 @@ fn a_player_host_rehosts_from_an_online_listing_without_reinitializing() {
     engine.recover(5);
     assert_eq!(engine.on_event(&online(), 6)[0].message, "CreateLobby");
 }
+
+#[test]
+fn leaving_a_player_match_straight_to_a_menu_counts_it_and_rehosts() {
+    let mut engine = armed();
+    engine.phase = Phase::InGame;
+    let menu = event("SetGlueScreen", json!({"screen":"MULTIPLAYER_CUSTOM_GAMES_SETUP"}));
+    assert!(engine.on_event(&menu, 100).is_empty());
+    assert!(engine.take_match_ended(), "the replay is read for this match");
+    assert_eq!(engine.number(), 2);
+    let Phase::Cooldown(until) = engine.phase else { panic!("cooldown") };
+    assert!(
+        !engine.tick(until).iter().any(|c| c.message == "ScoreScreenClose"),
+        "no results screen to close"
+    );
+    assert_eq!(engine.on_event(&online(), until + 1)[0].message, "CreateLobby");
+}

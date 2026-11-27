@@ -295,7 +295,19 @@ impl App {
         }
         self.log(&line);
         let own = self.own_name.clone();
-        let bans = to_ban(&summary, self.form.profile.early_leave_rule, window, own.as_deref());
+        // The early-leave limit is a Direct Strike rule; other maps only list leavers.
+        let rule = if self
+            .form
+            .profile
+            .map
+            .as_deref()
+            .is_some_and(ghost_reforged::config::is_direct_strike_map)
+        {
+            self.form.profile.early_leave_rule
+        } else {
+            EarlyLeaveRule::Off
+        };
+        let bans = to_ban(&summary, rule, window, own.as_deref());
         let mut banned = Vec::new();
         for (name, at) in bans {
             let reason = format!("Left the game early ({})", replay::clock(at));
@@ -450,6 +462,7 @@ mod tests {
         let mut app = App::new(directory.path(), None);
         app.ban_file = directory.path().join("bans-replay.json");
         app.own_name = Some("Me#1".into());
+        app.form.profile.map = Some(PathBuf::from(r"C:\Maps\5335_Direct Strike 6.5.13f.w3x"));
         app.last_game = Some(super::super::ban_list::LastGame {
             lobby: "DS #1".into(),
             players: vec!["Early#2".into(), "Late#3".into()],
@@ -465,6 +478,23 @@ mod tests {
         let list = ghost_reforged::bans::BanList::open(Some(&app.ban_file));
         assert_eq!(list.get("early#2").unwrap().reason, "Left the game early (4:10)");
         assert!(!list.is_banned("Late#3") && !list.is_banned("Me#1"));
+    }
+
+    #[test]
+    fn other_maps_only_list_early_leavers() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut app = App::new(directory.path(), None);
+        app.ban_file = directory.path().join("bans-other.json");
+        app.form.profile.map = Some(PathBuf::from(r"C:\Maps\Legion TD.w3x"));
+        app.last_game = Some(super::super::ban_list::LastGame {
+            lobby: "TD #1".into(),
+            players: vec!["Early#2".into()],
+            ..Default::default()
+        });
+        app.replay_read(Ok(summary()));
+        assert!(app.last_game.as_ref().unwrap().auto_banned.is_empty());
+        let list = ghost_reforged::bans::BanList::open(Some(&app.ban_file));
+        assert!(!list.is_banned("Early#2"));
     }
 
     #[test]

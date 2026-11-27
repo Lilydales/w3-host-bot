@@ -161,6 +161,23 @@ impl Engine {
             self.player_match_over(now);
             return Vec::new();
         }
+        // Player mode: the bot (or the player) left a running match straight to a menu,
+        // without a results screen. Count it the same way; there is nothing to close.
+        if self.config.host_mode == HostMode::Player
+            && self.owned
+            && self.phase == Phase::InGame
+            && kind == "SetGlueScreen"
+            && matches!(
+                payload["screen"].as_str(),
+                Some("MAIN_MENU" | "MULTIPLAYER_CUSTOM_GAMES_SETUP" | "CUSTOM_LOBBIES")
+            )
+        {
+            self.player_match_over(now);
+            self.score_close_pending = false;
+            self.menu_required = false;
+            self.initialization_required = false;
+            return Vec::new();
+        }
         if !self.owned
             && (self.awaiting_session() || self.phase == Phase::WatchingGame)
             && kind == "SetGlueScreen"

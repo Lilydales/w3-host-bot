@@ -511,9 +511,16 @@ pub(super) fn settings_rows(app: &App) -> Vec<(&'static str, String)> {
         ("DS filter", filter),
         ("Rehost", rehost),
     ];
+    if !profile
+        .map
+        .as_deref()
+        .is_some_and(ghost_reforged::config::is_direct_strike_map)
+    {
+        rows.push(("Map type", "Other (DS features off)".into()));
+    }
     if profile.player_host {
         rows.push((
-            "Auto-quit",
+            "Auto-exit",
             if profile.auto_quit {
                 format!("on · {} s", profile.auto_quit_delay_seconds)
             } else {
@@ -1187,10 +1194,11 @@ mod tests {
         let get = |rows: &[(&str, String)], key: &str| rows.iter().find(|r| r.0 == key).map(|r| r.1.clone());
         assert_eq!(get(&rows, "Next game").as_deref(), Some("Mix Mode DS #8"));
         assert_eq!(get(&rows, "DS filter").as_deref(), Some("level 10+"));
-        assert!(get(&rows, "Auto-quit").is_none());
+        assert!(get(&rows, "Auto-exit").is_none());
+        assert!(get(&rows, "Map type").is_some(), "no map is not Direct Strike");
         app.form.profile.player_host = true;
         let rows = settings_rows(&app);
-        assert_eq!(get(&rows, "Auto-quit").as_deref(), Some("on · 5 s"));
+        assert_eq!(get(&rows, "Auto-exit").as_deref(), Some("on · 5 s"));
         assert_eq!(get(&rows, "Rehost").as_deref(), Some("on"));
     }
 

@@ -187,7 +187,25 @@ impl Default for Config {
     }
 }
 
+/// Whether a map file is a Direct Strike map ("5335_Direct Strike 6.5.13f.w3x" and the
+/// like). Direct Strike-only features (ds-report lookups and filter, the end-panel exit,
+/// early-leave bans) stay off for every other map.
+pub fn is_direct_strike_map(path: &Path) -> bool {
+    path.file_name()
+        .map(|name| name.to_string_lossy().to_lowercase())
+        .is_some_and(|name| {
+            name.chars()
+                .filter(char::is_ascii_alphanumeric)
+                .collect::<String>()
+                .contains("directstrike")
+        })
+}
+
 impl Config {
+    pub fn is_direct_strike(&self) -> bool {
+        self.maps.iter().any(|map| is_direct_strike_map(map))
+    }
+
     pub fn load(path: &Path) -> Result<Self, ConfigError> {
         let mut config: Self = toml::from_str(&fs::read_to_string(path)?)?;
         // Map paths are relative to the config, never the shell's current directory.
