@@ -42,7 +42,17 @@ pub fn view(app: &App) -> Element<'_, Message> {
         });
     let status = tooltip(
         led,
-        container(text(format!("{} · {}", app.game.label(), app.game.tooltip())).size(13))
+        container(
+            text(format!(
+                "{} · {}{}",
+                app.game.label(),
+                app.game.tooltip(),
+                app.battlenet
+                    .map(|state| format!("\n{}", state.label()))
+                    .unwrap_or_default()
+            ))
+            .size(13),
+        )
             .padding(10)
             .style(p::panel),
         tooltip::Position::Bottom,

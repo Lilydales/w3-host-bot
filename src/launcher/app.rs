@@ -105,6 +105,10 @@ pub enum Message {
     NewProfile,
     PollProcess,
     ProcessObserved(process::Observation),
+    /// Battle.net running / signed-in state, polled with the game process.
+    BattleNetObserved(ghost_reforged::battlenet::State),
+    /// Bring up (or start) the Battle.net app so the user can sign in.
+    OpenBattleNet,
     ClearLog,
 }
 
@@ -209,6 +213,8 @@ pub struct App {
     pub picking: bool,
     pub store: Option<Store>,
     pub game: GameState,
+    /// Last known Battle.net state; `None` until the first check.
+    pub battlenet: Option<ghost_reforged::battlenet::State>,
     pub worker: Option<Worker>,
     pub lobby: Option<Snapshot>,
     /// Direct Strike lookups for players in the current lobby (`None` = not on W3Champions).
@@ -292,6 +298,7 @@ impl App {
             picking: false,
             store,
             game: GameState::Checking,
+            battlenet: None,
             worker: None,
             lobby: None,
             ds_stats: Default::default(),
@@ -401,6 +408,7 @@ impl App {
                     | Message::PollHost
                     | Message::PollProcess
                     | Message::ProcessObserved(_)
+                    | Message::BattleNetObserved(_)
                     | Message::CloseRequested(_)
                     | Message::QuitRequested(_)
                     | Message::Stop
@@ -677,7 +685,31 @@ impl App {
             }
             Message::PollProcess if !self.probing => {
                 self.probing = true;
-                return Task::perform(async { process::observe() }, Message::ProcessObserved);
+                return Task::batch([
+                    Task::perform(async { process::observe() }, Message::ProcessObserved),
+                    Task::perform(
+                        async { ghost_reforged::battlenet::state() },
+                        Message::BattleNetObserved,
+                    ),
+                ]);
+            }
+            Message::BattleNetObserved(state) => {
+                if self.battlenet.is_some_and(|old| old != state) {
+                    self.log(state.label());
+                }
+                self.battlenet = Some(state);
+            }
+            Message::OpenBattleNet => {
+                match ghost_reforged::battlenet::find_launcher() {
+                    Some(path) => {
+                        let result = std::process::Command::new(path)
+                            .spawn()
+                            .map(|_| ())
+                            .map_err(|_| "Battle.net could not be started.".to_string());
+                        self.notify(result, "Battle.net opened. Sign in; hosting continues automatically.");
+                    }
+                    None => self.notify(Err("Battle.net was not found.".into()), ""),
+                }
             }
             Message::ProcessObserved(game) => {
                 if game.pid.is_some() || game.state == GameState::Stopped {

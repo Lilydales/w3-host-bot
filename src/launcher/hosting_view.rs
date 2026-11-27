@@ -276,6 +276,23 @@ fn status_bar<'a>(app: &'a App, controls: iced::widget::Row<'a, Message>) -> Ele
             if app.notice_error { p::ERROR } else { p::MUTED },
         ));
     }
+    // Battle.net is open but nobody is signed in: hosting cannot start the game.
+    if app.battlenet == Some(ghost_reforged::battlenet::State::SignedOut) {
+        info = info.push(
+            row![
+                text("Battle.net is not signed in.").size(13).color(p::GOLD),
+                effects::hover(
+                    button(text("Open Battle.net ▸").size(13).color(p::GOLD))
+                        .padding([0, 4])
+                        .style(p::inset)
+                        .on_press(Message::OpenBattleNet),
+                    true,
+                ),
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center),
+        );
+    }
     let preview = effects::hover(
         button(
             row![

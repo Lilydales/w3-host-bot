@@ -64,11 +64,16 @@ mod native {
         stop: &AtomicBool,
         deadline: Instant,
     ) -> Result<Option<Background>, String> {
-        let root = std::env::var_os("ProgramFiles(x86)")
-            .ok_or("Warcraft III installation was not found.")?;
-        let root = PathBuf::from(root);
-        let launcher = root.join("Battle.net/Battle.net.exe");
-        if launcher.is_file() {
+        // Battle.net and the game are often installed outside C:\Program Files (x86).
+        if let Some(launcher) = crate::battlenet::find_launcher() {
+            if crate::battlenet::state() == crate::battlenet::State::SignedOut {
+                // Starting the game would only show Battle.net's login screen.
+                let _ = spawn(&launcher, "");
+                return Err(
+                    "Battle.net is not signed in. Sign in to Battle.net; hosting continues automatically."
+                        .into(),
+                );
+            }
             quiet.prepare(&launcher, stop, deadline)?;
             if stop.load(std::sync::atomic::Ordering::SeqCst) {
                 return Ok(None);
@@ -77,10 +82,9 @@ mod native {
             quiet.requested();
             return Ok(None);
         }
-        let path = root.join("Warcraft III/_retail_/x86_64/Warcraft III.exe");
-        if !path.is_file() {
-            return Err("Start Warcraft III before hosting on this installation.".into());
-        }
+        let Some(path) = crate::battlenet::find_game() else {
+            return Err("Battle.net and Warcraft III were not found. Start Warcraft III, then click Host.".into());
+        };
         Ok(Some(Background::attach(spawn(
             &path,
             "-launch -windowmode windowed",

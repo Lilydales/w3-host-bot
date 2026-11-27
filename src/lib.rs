@@ -1,4 +1,5 @@
 pub mod bans;
+pub mod battlenet;
 pub mod commands;
 pub mod config;
 pub mod diagnostics;

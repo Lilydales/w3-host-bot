@@ -7,6 +7,18 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.21.0 - 2026-11-27
+
+### Added
+- **Battle.net sign-in check** (`src/battlenet.rs`, new), like the W3Champions launcher: reads Battle.net's own client log (`%LOCALAPPDATA%\Battle.net\Logs\battle.net-*.log`, newest file, last 4 MB). The last of `Logged into Battle.net successfully` / `Account manager state has changed to: Ready` (signed in) or `Disconnected from Battle.net` / `... Incomplete` (signed out) wins. Checked against the user's real log. No credentials or tokens are read.
+- When hosting starts and Battle.net is running but signed out, the bot opens Battle.net and says "Battle.net is not signed in. Sign in to Battle.net; hosting continues automatically." instead of launching the game into a login screen; the normal retry picks it up once signed in.
+- Hosting status bar: "Battle.net is not signed in." with an **Open Battle.net ▸** link. The header status light's tooltip adds the Battle.net state. Activity logs each change. Polled every 3 s with the game process (`Message::BattleNetObserved`, `App::battlenet`).
+
+### Fixed
+- **Battle.net / Warcraft III installed on another drive.** The launcher path was hard-coded to `%ProgramFiles(x86)%\Battle.net` (C:), so with `D:\Program Files (x86)\Battle.net` the bot could not start the game ("Start Warcraft III before hosting on this installation"). It now uses the running Battle.net.exe, else searches `Program Files (x86)`, `Program Files` and the root of drives C–Z (`battlenet::find_launcher`, `find_game`).
+- Tests: `the_last_sign_in_signal_in_the_log_wins`, `install_folders_on_other_drives_are_searched`.
+- Bumped the bot and Windows installer to 0.21.0. Not compiled in the editing environment.
+
 ## 0.20.0 - 2026-11-27
 
 ### Added

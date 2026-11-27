@@ -65,10 +65,8 @@ impl Launch {
     }
 
     pub(crate) fn watch(&mut self, stop: &AtomicBool, deadline: Instant) -> Result<(), String> {
-        if self.path.is_none()
-            && let Some(root) = std::env::var_os("ProgramFiles(x86)")
-        {
-            self.path = Some(PathBuf::from(root).join("Battle.net/Battle.net.exe"));
+        if self.path.is_none() {
+            self.path = crate::battlenet::find_launcher();
         }
         self.poll(stop, deadline)
     }
