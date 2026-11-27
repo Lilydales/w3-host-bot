@@ -7,6 +7,12 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.18.2 - 2026-11-27
+
+### Fixed
+- UI test `rendered_menu_opens_selects_and_closes_without_clicking_underneath` could not find the Auto start menu. Since 0.18.0 the test's click search also scans the header, where hovering the Warcraft III status light (a tooltip) marks the layout outdated; later clicks on the stale layout were ignored. `Harness::find` now rebuilds the interface whenever an update reports it outdated. Test-only change; no app behaviour changed.
+- Bumped the bot and Windows installer to 0.18.2.
+
 ## 0.18.1 - 2026-11-27
 
 ### Fixed

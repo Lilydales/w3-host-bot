@@ -95,12 +95,11 @@ impl Harness {
     /// Clicks a grid of points on one built frame and returns the first point whose click
     /// produces a wanted message. Layout-independent, so moving panels never breaks a test.
     fn find(&mut self, app: &App, wanted: impl Fn(&Message) -> bool) -> Option<Point> {
-        let mut ui = UserInterface::build(
-            view::view(app),
-            self.size,
-            std::mem::take(&mut self.cache),
-            &mut self.renderer,
-        );
+        use iced_runtime::user_interface::State;
+        let build = |cache: Cache, renderer: &mut Renderer, size: Size| {
+            UserInterface::build(view::view(app), size, cache, renderer)
+        };
+        let mut ui = build(std::mem::take(&mut self.cache), &mut self.renderer, self.size);
         let mut found = None;
         let mut y = 4.0;
         'scan: while y < self.size.height {
@@ -108,7 +107,7 @@ impl Harness {
             while x < self.size.width {
                 let position = Point::new(x, y);
                 let mut messages = Vec::new();
-                ui.update(
+                let (state, _) = ui.update(
                     &[
                         Event::Mouse(mouse::Event::CursorMoved { position }),
                         Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
@@ -122,6 +121,12 @@ impl Harness {
                 if messages.iter().any(&wanted) {
                     found = Some(position);
                     break 'scan;
+                }
+                // Hovering a tooltip or similar marks the layout outdated; later clicks
+                // on a stale layout can be ignored, so rebuild before continuing.
+                if matches!(state, State::Outdated) {
+                    let cache = ui.into_cache();
+                    ui = build(cache, &mut self.renderer, self.size);
                 }
                 x += 8.0;
             }
