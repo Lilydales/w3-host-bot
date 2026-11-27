@@ -7,6 +7,14 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.18.4 - 2026-11-27
+
+### Fixed
+- **Play-as-host got stuck after a match** ("Waiting for Battle.net…", "Waiting for a fresh Battle.net session", repeating) until Host was stopped and started again. After closing the results, the bot now reuses the signed-in session the same way a fresh Host click does: `ScoreScreenClose` + `GetGameList`, then creates the lobby from an online listing or a provider confirmation. It no longer waits for a menu callback or re-initializes the provider. A reconnect while waiting also skips re-initialization for a player host (`Engine::recover`); the observer host is unchanged.
+- **Header tabs**: labels were drawn at the top of the tab and clipped by its frame; they are centred now (padding 14 / 12).
+- Tests updated for the new return path; new `a_player_host_rehosts_from_an_online_listing_without_reinitializing`.
+- Bumped the bot and Windows installer to 0.18.4.
+
 ## 0.18.3 - 2026-11-27
 
 ### Fixed

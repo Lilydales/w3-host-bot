@@ -13,7 +13,9 @@ impl Engine {
             self.phase = Phase::AwaitMenu;
             self.provider_ready = false;
             self.menu_required = false;
-            self.initialization_required = true;
+            // A player host's client stays signed in; re-initializing it can wait for a
+            // callback that never comes. The observer host keeps the stricter path.
+            self.initialization_required = self.config.host_mode != HostMode::Player;
             return;
         }
         self.phase = Phase::Recovering(now);

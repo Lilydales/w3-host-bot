@@ -105,7 +105,7 @@ fn owned_results_after_a_missed_start_respect_the_rehost_delay() {
     let commands = engine.tick(until);
     assert_eq!(
         commands.iter().map(|command| command.message).collect::<Vec<_>>(),
-        ["ScoreScreenClose", "InitializeNetProvider"],
+        ["ScoreScreenClose", "GetGameList"],
     );
 }
 

@@ -273,17 +273,12 @@ fn a_player_host_sees_the_results_then_returns_and_hosts_the_next_lobby() {
     let commands = engine.tick(115);
     assert_eq!(
         commands.iter().map(|c| c.message).collect::<Vec<_>>(),
-        ["ScoreScreenClose", "InitializeNetProvider"]
+        ["ScoreScreenClose", "GetGameList"]
     );
     assert_eq!(engine.phase, Phase::AwaitMenu);
     assert!(engine.tick(116).is_empty(), "closed once");
-    // Nothing is created until the game reports a menu again.
-    assert!(engine.on_event(&event("GameList", json!({})), 117).is_empty());
-    engine.on_event(
-        &event("SetGlueScreen", json!({"screen":"MULTIPLAYER_CUSTOM_GAMES_SETUP"})),
-        118,
-    );
-    let next = engine.on_event(&event("GameList", json!({})), 119);
+    // The signed-in session is reused: no menu callback is required.
+    let next = engine.on_event(&event("GameList", json!({})), 117);
     assert_eq!(next[0].message, "InitializeNetProvider");
     let created = engine.on_event(
         &event("OnNetProviderChanged", json!({"providerId":"BNET"})),
@@ -392,4 +387,20 @@ fn live_rehost_settings_never_turn_on_observer_only_leaving_for_a_player_host() 
     engine.config.host_mode = HostMode::Observer;
     engine.update_rehost(true, 15, 2);
     assert!(engine.config.leave_on_load && engine.config.restart_on_load);
+}
+
+#[test]
+fn a_player_host_rehosts_from_an_online_listing_without_reinitializing() {
+    let mut engine = armed();
+    engine.phase = Phase::InGame;
+    engine.on_event(&event("GameClosed", json!({})), 10);
+    let Phase::Cooldown(until) = engine.phase else { panic!("cooldown") };
+    engine.tick(until);
+    let created = engine.on_event(&online(), until + 1);
+    assert_eq!(created[0].message, "CreateLobby", "an online listing reuses the session");
+    // A reconnect while waiting does not demand a fresh initialization either.
+    let mut engine = armed();
+    engine.phase = Phase::AwaitMenu;
+    engine.recover(5);
+    assert_eq!(engine.on_event(&online(), 6)[0].message, "CreateLobby");
 }

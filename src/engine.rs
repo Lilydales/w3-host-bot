@@ -535,13 +535,15 @@ impl Engine {
                 self.phase = Phase::AwaitMenu;
                 let player_results = self.config.host_mode == HostMode::Player && self.score_open;
                 if std::mem::take(&mut self.score_close_pending) || player_results {
-                    // Wait for the menu before creating, exactly like the observer path.
-                    self.menu_required = true;
+                    // Reuse the signed-in session, like clicking Host again: ask for the
+                    // game list and create as soon as Battle.net is confirmed. Waiting for a
+                    // menu callback or a fresh initialization could stall here forever.
+                    self.menu_required = false;
+                    self.initialization_required = false;
                     self.provider_ready = false;
-                    // Same return path as the observer host after a match.
                     return vec![
                         Command::empty("ScoreScreenClose"),
-                        Command::empty("InitializeNetProvider"),
+                        Command::empty("GetGameList"),
                     ];
                 }
             }

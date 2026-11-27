@@ -437,10 +437,9 @@ fn next_lobby_waits_for_score_screen_cooldown_and_fresh_provider() {
     assert_eq!(engine.number(), 2, "counted once");
     assert_eq!(
         engine.tick(1016).iter().map(|c| c.message).collect::<Vec<_>>(),
-        ["ScoreScreenClose", "InitializeNetProvider"]
+        ["ScoreScreenClose", "GetGameList"]
     );
     assert!(engine.tick(1100).is_empty());
-    assert!(engine.on_event(&event("GameList", json!({})), 1100).is_empty(), "waits for the menu");
     engine.on_event(&event("SetGlueScreen", json!({"screen":"MULTIPLAYER_CUSTOM_GAMES_SETUP"})), 1101);
     engine.on_event(&event("GameList", json!({})), 1101);
     let commands = engine.on_event(

@@ -83,7 +83,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
                         .spacing(7)
                         .align_y(Alignment::Center),
                 )
-                .padding([0, 11])
+                .padding([14, 12])
                 .height(bg::TAB_HEIGHT)
                 .style(if app.page == page {
                     p::primary
