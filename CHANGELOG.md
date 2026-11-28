@@ -7,6 +7,12 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.26.1 - 2026-11-28
+
+### Fixed
+- **Early-leave bans: only the first leaver.** Before the limit, the first leave ends a Direct Strike match, so players who left after that were leaving a match that was already ending. Only the first leaver is banned now (plus anyone who left within 2 s of them); later leavers are listed in Activity as "(after the first leaver, not counted)". If you (the host) left first, nobody is banned. Leaves after the limit under "Any early leave" are unchanged. `replays::to_ban`, `after_first`. Test: `only_the_first_leaver_before_the_limit_is_banned`.
+- Bumped the bot and Windows installer to 0.26.1. Not compiled in the editing environment.
+
 ## 0.26.0 - 2026-11-28
 
 ### Added

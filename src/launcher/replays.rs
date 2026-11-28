@@ -137,9 +137,37 @@ pub fn near_end<'a>(summary: &'a Summary, window: Window) -> Vec<&'a replay::Lea
         .collect()
 }
 
+/// Leaves at the same moment as the first one count as "first" too (simultaneous quits).
+const SAME_MOMENT_MS: u64 = 2_000;
+
+/// Before the limit, the first leave ends a Direct Strike match. Only whoever left first
+/// (and anyone at the same moment) caused it; everyone who left after that was leaving a
+/// match that was already ending. Returns the time of the first leave and whether it
+/// counts (`false` when the host left first: then nobody is to blame).
+fn first_leave(summary: &Summary, window: Window, own: Option<&str>) -> Option<(u64, bool)> {
+    let first = early(summary, window)
+        .into_iter()
+        .filter(|leave| leave.at_ms < window.limit_ms)
+        .find(|leave| leave.name.contains('#'))?;
+    let host_first = own.is_some_and(|own| own.eq_ignore_ascii_case(&first.name));
+    Some((first.at_ms, !host_first))
+}
+
+/// Leaves before the limit that came after the first leaver: not banned.
+pub fn after_first<'a>(summary: &'a Summary, window: Window, own: Option<&str>) -> Vec<&'a replay::Leave> {
+    let Some((first, _)) = first_leave(summary, window, own) else {
+        return Vec::new();
+    };
+    early(summary, window)
+        .into_iter()
+        .filter(|leave| leave.at_ms < window.limit_ms && leave.at_ms > first + SAME_MOMENT_MS)
+        .filter(|leave| own.is_none_or(|own| !own.eq_ignore_ascii_case(&leave.name)))
+        .collect()
+}
+
 /// Who the rule bans: (player, leave time in ms). Never the host, never a name without a
 /// BattleTag (observers such as FLO), never someone who left with everyone at the end or
-/// inside the end buffer.
+/// inside the end buffer, and before the limit only the first leaver (see `first_leave`).
 pub fn to_ban(
     summary: &Summary,
     rule: EarlyLeaveRule,
@@ -151,9 +179,18 @@ pub fn to_ban(
         EarlyLeaveRule::BeforeSevenMinutes => window.limit_ms,
         EarlyLeaveRule::AnyEarlyLeave => u64::MAX,
     };
+    let first = first_leave(summary, window, own);
     early(summary, window)
         .into_iter()
         .filter(|leave| leave.at_ms < limit)
+        .filter(|leave| match first {
+            // Before the limit: only the first leaver (and the same moment), and nobody
+            // if the host left first.
+            Some((at, counts)) if leave.at_ms < window.limit_ms => {
+                counts && leave.at_ms <= at + SAME_MOMENT_MS
+            }
+            _ => true,
+        })
         .filter(|leave| leave.name.contains('#'))
         .filter(|leave| own.is_none_or(|own| !own.eq_ignore_ascii_case(&leave.name)))
         .map(|leave| (leave.name.clone(), leave.at_ms))
@@ -331,8 +368,20 @@ impl App {
         if leavers.is_empty() {
             line.push_str(" · nobody left early");
         }
-        for leave in &leavers {
+        let later: Vec<String> = after_first(&summary, window, self.own_name.as_deref())
+            .into_iter()
+            .map(|l| l.name.clone())
+            .collect();
+        for leave in leavers.iter().filter(|l| !later.contains(&l.name)) {
             line.push_str(&format!(" · {} left at {}", leave.name, replay::clock(leave.at_ms)));
+        }
+        let own_name = self.own_name.clone();
+        for leave in after_first(&summary, window, own_name.as_deref()) {
+            line.push_str(&format!(
+                " · {} left at {} (after the first leaver, not counted)",
+                leave.name,
+                replay::clock(leave.at_ms)
+            ));
         }
         for leave in near_end(&summary, window) {
             line.push_str(&format!(
@@ -466,12 +515,38 @@ mod tests {
         assert_eq!(names(EarlyLeaveRule::BeforeSevenMinutes), ["Early#2"]);
         assert_eq!(names(EarlyLeaveRule::AnyEarlyLeave), ["Early#2", "Late#3"]);
         assert!(names(EarlyLeaveRule::Off).is_empty());
+        // Me#1 (the host) left at 5:00, after Early#2: never banned anyway.
         let mut observer = summary();
         observer.leaves[0].name = "FLO".into();
         assert!(
             to_ban(&observer, EarlyLeaveRule::BeforeSevenMinutes, window, Some("me#1")).is_empty(),
             "FLO is not a ban candidate, and the known host remains excluded"
         );
+    }
+
+    #[test]
+    fn only_the_first_leaver_before_the_limit_is_banned() {
+        let leave = |name: &str, seconds: u64| Leave { name: name.into(), at_ms: seconds * 1000 };
+        let summary = Summary {
+            players: vec!["Me#1".into(), "First#2".into(), "Same#3".into(), "Then#4".into()],
+            // First#2 quits at 3:00 (match ends), Same#3 at the same moment, Then#4 after.
+            leaves: vec![leave("First#2", 180), leave("Same#3", 181), leave("Then#4", 200)],
+            length_ms: 600_000,
+        };
+        let window = Window::from_minutes(8, 0);
+        let names = |rule, own| -> Vec<String> {
+            to_ban(&summary, rule, window, own).into_iter().map(|b| b.0).collect()
+        };
+        assert_eq!(names(EarlyLeaveRule::BeforeSevenMinutes, Some("me#1")), ["First#2", "Same#3"]);
+        assert_eq!(names(EarlyLeaveRule::AnyEarlyLeave, Some("me#1")), ["First#2", "Same#3"]);
+        assert_eq!(
+            after_first(&summary, window, Some("me#1")).iter().map(|l| l.name.as_str()).collect::<Vec<_>>(),
+            ["Then#4"]
+        );
+        // The host left first: nobody is banned for the early end.
+        let mut host_first = summary.clone();
+        host_first.leaves.insert(0, leave("Me#1", 100));
+        assert!(to_ban(&host_first, EarlyLeaveRule::BeforeSevenMinutes, window, Some("me#1")).is_empty());
     }
 
     #[test]
