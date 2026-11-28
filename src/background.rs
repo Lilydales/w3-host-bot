@@ -66,14 +66,9 @@ mod native {
     ) -> Result<Option<Background>, String> {
         // Battle.net and the game are often installed outside C:\Program Files (x86).
         if let Some(launcher) = crate::battlenet::find_launcher() {
-            if crate::battlenet::state() == crate::battlenet::State::SignedOut {
-                // Starting the game would only show Battle.net's login screen.
-                let _ = spawn(&launcher, "");
-                return Err(
-                    "Battle.net is not signed in. Sign in to Battle.net; hosting continues automatically."
-                        .into(),
-                );
-            }
+            // The sign-in state read from Battle.net's log is only a hint (the log can
+            // rotate or miss the sign-in line), so it never blocks the launch: Battle.net
+            // shows its own login screen if it really is signed out.
             quiet.prepare(&launcher, stop, deadline)?;
             if stop.load(std::sync::atomic::Ordering::SeqCst) {
                 return Ok(None);

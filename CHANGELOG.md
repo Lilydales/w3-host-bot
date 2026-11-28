@@ -7,6 +7,13 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.22.1 - 2026-11-28
+
+### Fixed
+- **Game no longer started: "Battle.net is not signed in … Retrying" loop.** The sign-in check from 0.21.0 read Battle.net's log and refused to launch when it found no sign-in line (a fresh or rotated log has none), then opened Battle.net to the front on every retry instead of sending "launch W3". The log state is now only a hint: the bot always sends the launch, and a log with no sign-in line counts as "unknown", not "signed out" (`background::launch`, `battlenet::state`).
+- The 0.22.0 refocus watcher does not take focus away from Battle.net while it is reported signed out, so the login screen stays usable.
+- Bumped the bot and Windows installer to 0.22.1. Not compiled in the editing environment.
+
 ## 0.22.0 - 2026-11-28
 
 ### Added

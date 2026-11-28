@@ -100,7 +100,8 @@ pub fn state() -> State {
         Some(text) => match signed_in(&text) {
             Some(true) => State::SignedIn,
             Some(false) => State::SignedOut,
-            None => State::SignedOut,
+            // No sign-in line in this log (new session, rotated log): unknown, not out.
+            None => State::Unknown,
         },
         None => State::Unknown,
     }

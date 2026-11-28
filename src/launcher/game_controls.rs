@@ -150,7 +150,9 @@ impl App {
     pub(super) fn start_refocus(&mut self) {
         let profile = &self.form.profile;
         // Observer hosting keeps Battle.net and the game hidden; nothing to take back.
-        if !profile.player_host || !profile.refocus_after_launch || game_running(self.game) || self.hidden {
+        // Battle.net may need the user (login screen): leave it in front then.
+        let signed_out = self.battlenet == Some(ghost_reforged::battlenet::State::SignedOut);
+        if signed_out || !profile.player_host || !profile.refocus_after_launch || game_running(self.game) || self.hidden {
             return;
         }
         let cancel = Arc::new(AtomicBool::new(false));
