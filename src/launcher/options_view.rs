@@ -91,8 +91,8 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
                                 seat_choices(),
                             ),
                             muted(
-                                "Moves you to this colour in each new lobby; Random picks a free \
-                                 colour other than red. Changing it while hosting moves you now. \
+                                "Moves you to this colour in each new lobby; Random picks any free \
+                                 colour (if it picks your current one, you stay). Changing it while hosting moves you now. \
                                  If the colour is taken or locked by the map, you stay put."
                             ),
                         ]
@@ -167,6 +167,18 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
         }),
         rule::horizontal(1),
         early_leavers(app),
+        rule::horizontal(1),
+        text("Close button (X)").size(20),
+        row![
+            muted(format!("Current: {}", app.close_choice.label())).width(Fill),
+            super::widgets::action(
+                "Ask again",
+                Message::CloseAskAgain,
+                app.close_choice != super::close_ui::CloseChoice::Ask
+            ),
+        ]
+        .spacing(9)
+        .align_y(Alignment::Center),
         rule::horizontal(1),
         text("Sounds").size(20),
         toggler(profile.play_sounds)

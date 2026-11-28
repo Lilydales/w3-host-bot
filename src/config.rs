@@ -82,7 +82,7 @@ pub enum Seat {
     /// Wherever Warcraft III puts the host (usually red, position 1).
     #[default]
     Default,
-    /// A random free colour other than red.
+    /// A random colour each lobby; red included (then the host stays put).
     Random,
     /// A fixed colour, `crate::commands::COLORS` index (0 = red).
     Color(u8),
@@ -92,7 +92,7 @@ impl Seat {
     pub fn label(self) -> String {
         match self {
             Self::Default => "Map default".into(),
-            Self::Random => "Random (not red)".into(),
+            Self::Random => "Random".into(),
             Self::Color(color) => crate::commands::color_name(color),
         }
     }

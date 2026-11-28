@@ -372,7 +372,7 @@ fn seat_picker(app: &App) -> Element<'_, Message> {
             app.form.profile.seat.label(),
             super::options_view::seat_choices(),
         ),
-        muted("Random = a free colour other than red, picked again for each lobby."),
+        muted("Random = any free colour, picked again for each lobby (red = stay put)."),
     ]
     .spacing(4)
     .into()

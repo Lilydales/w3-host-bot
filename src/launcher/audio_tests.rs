@@ -52,6 +52,7 @@ fn idle_launcher_mutes_until_quit_including_close_to_tray_and_stop_hosting() {
     }));
     wait_for(&session, 1);
     app.tray_available = true;
+    app.close_choice = super::close_ui::CloseChoice::Tray;
     let _ = app.update(Message::CloseRequested(iced::window::Id::unique()));
     assert!(app.hidden);
     let _ = app.update(Message::Stop);

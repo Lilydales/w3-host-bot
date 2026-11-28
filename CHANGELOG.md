@@ -7,6 +7,17 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.25.0 - 2026-11-28
+
+### Added
+- **One launcher at a time.** Starting GHost Reforged while another copy runs: if that copy is idle it is closed and the new one starts; if it is hosting, a warning explains it and offers to show the running window, and the new copy exits. If the other copy cannot be identified, a message says to quit it from the tray. The running launcher keeps `instance.json` (pid + hosting) in its data folder; a pid is only ended after checking it is the same exe. `src/launcher/instance.rs`.
+- **Close dialog for the X button** (like W3Champions): "Close GHost Reforged?" with Cancel, Minimise to tray, and Quit ("Stop and quit" while hosting), plus "Remember my choice". The remembered choice is in `close_choice.txt`; Options → "Close button (X)" shows it and has "Ask again". The tray icon's Quit is unchanged. `src/launcher/close_ui.rs`.
+
+### Changed
+- **Seat "Random" now includes red.** Any free colour you can reach, plus your current one; if the pick is your current colour you stay put (Activity: "Seat · random pick · staying on Red (1)"). Renamed from "Random (not red)" to "Random".
+- Tests: `an_idle_launcher_is_replaced_and_a_hosting_one_is_kept`, `the_record_round_trips`, `the_x_button_asks_and_a_remembered_choice_is_used_next_time`, `random_can_stay_on_red_but_never_picks_a_taken_colour`; tray tests set the close choice to Tray.
+- Bumped the bot and Windows installer to 0.25.0. Not compiled in the editing environment.
+
 ## 0.24.0 - 2026-11-28
 
 ### Added

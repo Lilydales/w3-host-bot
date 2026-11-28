@@ -1,5 +1,6 @@
 //! Player mode, Direct Strike maps only: moves the host to the chosen colour (position)
-//! in each new lobby, or to a random free colour other than red.
+//! in each new lobby, or to a random colour (any free colour, red included; if the pick
+//! is the colour you already have, you stay put).
 //!
 //! Direct Strike is a fixed-player-settings map: choosing a colour moves the player to
 //! that colour's slot (`SetColor`). A colour of the other team first needs `SetTeam`.
@@ -66,11 +67,11 @@ pub(super) fn step_towards(lobby: &Lobby, me: &Player, color: u8) -> Option<Comm
         .then(|| Command::new("SetTeam", json!({"slot":me.slot,"team":team})))
 }
 
-/// Free colours other than red that the host can reach (directly or via a team change).
+/// Colours a random pick can land on: the host's current colour (= stay) plus every
+/// free colour the host can reach (directly or via a team change). Red is included.
 pub(super) fn random_candidates(lobby: &Lobby, me: &Player) -> Vec<u8> {
-    (1..COLORS.len() as u8)
-        .filter(|&color| me.color != Some(color))
-        .filter(|&color| step_towards(lobby, me, color).is_some())
+    (0..COLORS.len() as u8)
+        .filter(|&color| me.color == Some(color) || step_towards(lobby, me, color).is_some())
         .collect()
 }
 
@@ -125,7 +126,7 @@ impl SeatPicker {
                 let choices = random_candidates(lobby, me);
                 if choices.is_empty() {
                     self.done = true;
-                    return (None, Some("Seat · no free colour for a random pick; staying put".into()));
+                    return (None, Some("Seat · no colour to pick from; staying put".into()));
                 }
                 choices[random_below(choices.len())]
             }
@@ -134,7 +135,12 @@ impl SeatPicker {
         self.target = Some(target);
         if me.color == Some(target) {
             self.done = true;
-            return (None, Some(format!("Seat · you are {}", color_name(target))));
+            let how = if config.seat == Seat::Random && self.tries == 0 {
+                "random pick · staying on"
+            } else {
+                "you are"
+            };
+            return (None, Some(format!("Seat · {how} {}", color_name(target))));
         }
         if self.tries >= MAX_TRIES {
             self.done = true;
@@ -202,12 +208,12 @@ mod tests {
     }
 
     #[test]
-    fn random_never_picks_red_or_a_taken_colour() {
+    fn random_can_stay_on_red_but_never_picks_a_taken_colour() {
         let lobby = lobby(json!([player(0, 0, 0, true), player(1, 0, 1, false)]));
         let me = lobby.local().unwrap();
         let choices = random_candidates(&lobby, me);
-        assert!(!choices.is_empty());
-        assert!(!choices.contains(&0), "never red");
+        assert!(choices.contains(&0), "red (the current colour) can be picked: stay put");
+        assert!(choices.len() > 1);
         assert!(!choices.contains(&1), "taken by a guest");
         assert!(choices.iter().all(|c| *c < 8), "only the map's colours");
     }

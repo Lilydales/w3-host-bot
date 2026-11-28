@@ -125,6 +125,13 @@ pub enum Message {
     ChatInput(String),
     ChatSend,
     PlaySounds(bool),
+    /// Close dialog (X button): minimise to tray, quit, or cancel.
+    CloseToTray,
+    CloseQuit,
+    CloseCancel,
+    CloseRemember(bool),
+    /// Options: forget the remembered close choice and ask again.
+    CloseAskAgain,
     OpenSoundsFolder,
     ClearLog,
 }
@@ -315,6 +322,12 @@ pub struct App {
     /// Chat lines that arrived while Recent activity was shown.
     pub(super) chat_unread: usize,
     pub(super) sounds: super::sounds::Sounds,
+    /// What the X button does: ask (default), or a remembered choice.
+    pub(super) close_choice: super::close_ui::CloseChoice,
+    /// The close dialog is open for this window; `remember` is its checkbox.
+    pub(super) close_prompt: Option<(iced::window::Id, bool)>,
+    /// Last hosting state written to `instance.json`.
+    pub(super) published_hosting: Option<bool>,
 }
 
 impl App {
@@ -389,6 +402,9 @@ impl App {
             chat_input: String::new(),
             chat_unread: 0,
             sounds: super::sounds::Sounds::new(directory),
+            close_choice: super::close_ui::load(directory),
+            close_prompt: None,
+            published_hosting: None,
         };
         super::sounds::prepare(directory);
         // Nothing to fill in: start with the settings folded away.
@@ -465,8 +481,14 @@ impl App {
         if let Message::Tray(event) = message {
             return self.tray_event(event);
         }
-        if let Message::CloseRequested(id) = message {
-            return self.hide_to_tray(id);
+        // Keep instance.json current so a second launcher knows whether we are hosting.
+        let hosting = self.worker.is_some();
+        if self.published_hosting != Some(hosting) {
+            self.published_hosting = Some(hosting);
+            super::instance::publish(&self.data_directory, hosting);
+        }
+        if let Some(task) = self.close_message(&message) {
+            return task;
         }
         if (self.motion.modal_visible() || self.updates.available.is_some())
             && !matches!(

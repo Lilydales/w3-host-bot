@@ -49,6 +49,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut app = App::new(dir.path(), None);
         app.tray_available = true;
+        app.close_choice = super::super::close_ui::CloseChoice::Tray;
         app.motion.modal = super::super::motion::Tween::settled(1.0);
         let _ = app.update(Message::CloseRequested(window::Id::unique()));
         assert!(app.hidden);
@@ -64,6 +65,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut app = App::new(dir.path(), None);
         app.tray_available = true;
+        app.close_choice = super::super::close_ui::CloseChoice::Tray;
         let _ = app.update(Message::CloseRequested(window::Id::unique()));
         let _ = app.update(Message::Tray(Event::Available(false)));
         assert!(!app.hidden);

@@ -187,7 +187,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
     } else {
         base
     };
-    super::update_ui::modal(app, composed)
+    super::close_ui::modal(app, super::update_ui::modal(app, composed))
 }
 fn profiles(app: &App) -> Element<'_, Message> {
     let mut items = column![].spacing(16);

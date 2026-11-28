@@ -17,7 +17,7 @@ Add new ideas at the bottom of the right section. Keep each item short: what, wh
 - **Allow players not found on W3C** even when the DS filter is on (option), so a broken ds-report lookup cannot empty lobbies.
 - **Ban list manager**: list, search and unban from the Options page (today: edit `bans.json`).
 - **Keep "Last game" across launcher restarts** (currently in memory only).
-- **Close-button choice** (from W3Champions): first time the window is closed, ask "Minimise to tray or quit?" with "remember my choice"; warn "You are in an active game" before quitting mid-match.
+- **Warn before quitting mid-match** ("You are in an active game") in the close dialog.
 - **Close Battle.net and Warcraft III** together (W3Champions has this action), e.g. as an option on Exit W3.
 - **Game session line** (from W3Champions' "Game Session: Lobby / Loading / Running / Ended"): one short state chip in the status bar instead of mixed status text.
 - **Seat: check the DS colour layout.** `seat.rs` assumes `availableTeamColors` lists each team's colours. If "Your position" does not move you, send a `w3-protocol.log` from a DS lobby.

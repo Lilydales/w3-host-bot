@@ -12,6 +12,8 @@ mod desktop;
 mod effects;
 mod frame_art;
 mod game_controls;
+mod instance;
+mod close_ui;
 mod hosting;
 mod hosting_view;
 mod journal;
@@ -64,6 +66,10 @@ fn main() -> iced::Result {
             .unwrap_or_else(|| PathBuf::from("."));
         storage::Store::default_directory(&root)
     });
+    // One launcher at a time: replace an idle one, keep (and warn about) a hosting one.
+    if !instance::ensure_single(&directory) {
+        return Ok(());
+    }
     iced::application(
         move || {
             let mut state = app::App::new(&directory, args.map.clone());
