@@ -7,6 +7,12 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.25.1 - 2026-11-28
+
+### Fixed
+- **Leftover large `w3-protocol.log`.** 0.23.1 stopped writing it, but an existing file from an older build stayed (and an older running build kept growing it). At startup, with protocol logging off (the default), `w3-protocol.log` and `w3-protocol.previous.log` are now deleted and Activity says so; with logging on, an oversized file is rotated right away. `protocol_log::tidy`.
+- Bumped the bot and Windows installer to 0.25.1. Not compiled in the editing environment.
+
 ## 0.25.0 - 2026-11-28
 
 ### Added

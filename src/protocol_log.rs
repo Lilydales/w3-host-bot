@@ -75,6 +75,30 @@ fn timestamp() -> String {
     )
 }
 
+/// Startup cleanup. With logging off, a leftover `w3-protocol.log` (and its rotation)
+/// from an older version is deleted; with logging on, an oversized one is rotated now.
+/// Returns a line for Activity when something was removed.
+pub fn tidy() -> Option<String> {
+    let path = std::env::var("W3_PROTOCOL_LOG_PATH").unwrap_or_else(|_| "w3-protocol.log".into());
+    let previous = path.trim_end_matches(".log").to_owned() + ".previous.log";
+    let size = |p: &str| fs::metadata(p).map(|m| m.len()).unwrap_or(0);
+    if !enabled() {
+        let total = size(&path) + size(&previous);
+        let removed = [&path, &previous]
+            .into_iter()
+            .filter(|p| fs::remove_file(p.as_str()).is_ok())
+            .count();
+        return (removed > 0).then(|| {
+            format!("Removed old protocol log ({} MB). It is off by default now.", total / (1024 * 1024))
+        });
+    }
+    if size(&path) >= MAX_BYTES {
+        let _ = fs::remove_file(&previous);
+        let _ = fs::rename(&path, &previous);
+    }
+    None
+}
+
 /// `raw` is the exact text frame (RECV: before deserialization; SEND: the
 /// serialized frame). Unparseable text is still logged, verbatim.
 pub fn log(direction: &str, raw: &str) {

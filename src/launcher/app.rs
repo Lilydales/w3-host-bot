@@ -410,6 +410,9 @@ impl App {
         // Nothing to fill in: start with the settings folded away.
         app.settings_open = !app.settings_complete();
         app.log("Launcher opened.");
+        if let Some(line) = ghost_reforged::protocol_log::tidy() {
+            app.log(&line);
+        }
         app
     }
 
