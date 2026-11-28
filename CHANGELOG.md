@@ -7,6 +7,15 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.26.0 - 2026-11-28
+
+### Added
+- **Direct Strike lobby shown by team.** On Direct Strike maps the Lobby panel groups slots under "Team 1" (positions 1, 3, 5…) and "Team 2" (2, 4, 6…), with observers below. Your own slot is listed in its team as "Name (you)". Other maps keep the plain list. `hosting_view::slot_row`, `ds_teams`.
+
+### Fixed
+- **"LastReplay.w3g was not found" after a match.** The replay reader gave up 22 s after the match ended and only looked for `LastReplay.w3g`. It now keeps looking for 3 minutes (Warcraft III writes the replay when it leaves the score screen) and also accepts the newest fresh `.w3g` with any name in the Replay/Replays folders and their `Autosaved` subfolder. The "not found" message now says which folder was searched.
+- Bumped the bot and Windows installer to 0.26.0. Not compiled in the editing environment.
+
 ## 0.25.2 - 2026-11-28
 
 ### Changed

@@ -408,6 +408,90 @@ fn game_tools(app: &App) -> Element<'_, Message> {
     tools.into()
 }
 
+/// One lobby row: number, name, level, slot menu, Kick/Ban; the host's own row is plain.
+fn slot_row<'a>(
+    app: &'a App,
+    lobby: &'a ghost_reforged::hosting::Snapshot,
+    slot: &'a ghost_reforged::hosting::Slot,
+) -> Element<'a, Message> {
+    if slot.own {
+        return container(
+            row![
+                muted(format!("{:02}", slot.number + 1)).width(30),
+                text(format!("{} (you)", slot.name)).size(15).color(p::GOLD).width(Fill),
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center),
+        )
+        .padding([9, 0])
+        .into();
+    }
+    let name = if slot.status == 0 {
+        "Open slot".into()
+    } else if slot.status == 1 {
+        "Closed slot".into()
+    } else if slot.computer {
+        "Computer".into()
+    } else if slot.name.is_empty() {
+        format!("Player {}", slot.number + 1)
+    } else {
+        slot.name.clone()
+    };
+    // Levels are shown in the Players section, not squeezed beside the name.
+    let name = text(name).size(15).width(Fill);
+    let mut item = row![muted(format!("{:02}", slot.number + 1)).width(30), name]
+    .spacing(8)
+    .align_y(Alignment::Center);
+    if slot.status == 2 && !slot.computer && !slot.name.is_empty() {
+        item = item.push(level_badge(app, &slot.name));
+    }
+    if slot.observer {
+        item = item.push(muted("Observer"));
+    }
+    let choices = lobby.slot_actions(slot.number);
+    if !choices.is_empty() {
+        item = item.push(
+            container(select(
+                app,
+                Menu::Slot(slot.number),
+                "Slot".into(),
+                choices.into_iter().map(|(action, request)| {
+                    (action.label().into(), Message::Slot(request))
+                }),
+            ))
+            .width(88),
+        );
+    }
+    if slot.status == 2 && !slot.computer {
+        let target = lobby.kick_target(slot.number);
+        item = item.push(super::widgets::optional_action(
+            "Kick",
+            target.clone().map(Message::Kick),
+        ));
+        item = item.push(super::widgets::optional_action(
+            "Ban",
+            target.map(Message::Ban),
+        ));
+    }
+    let mut entry = column![item].spacing(8);
+    if let Some((pending, reason)) = &app.ban_prompt
+        && slot.status == 2
+        && lobby.kick_target(slot.number).as_ref() == Some(pending)
+    {
+        entry = entry.push(ban_prompt(pending.name(), reason));
+    }
+    container(entry).padding([9, 0]).into()
+}
+
+/// Show the lobby as Team 1 / Team 2 (Direct Strike maps).
+fn ds_teams(app: &App) -> bool {
+    app.form
+        .profile
+        .map
+        .as_deref()
+        .is_some_and(ghost_reforged::config::is_direct_strike_map)
+}
+
 fn lobby(app: &App) -> Element<'_, Message> {
     // While a match runs there is no lobby; show who is playing in the same panel.
     if app.in_game
@@ -418,65 +502,25 @@ fn lobby(app: &App) -> Element<'_, Message> {
     }
     let mut players = column![].spacing(0).width(Fill);
     let (name, count) = if let Some(lobby) = &app.lobby {
-        for slot in &lobby.slots {
-            if slot.own {
-                continue;
+        if ds_teams(app) {
+            // Direct Strike: odd positions (1, 3, 5…) are Team 1, even ones Team 2.
+            for (team, title) in [(0u8, "Team 1"), (1u8, "Team 2")] {
+                players = players.push(container(text(title).size(15).color(p::GOLD)).padding([6, 0]));
+                for slot in lobby.slots.iter().filter(|s| !s.observer && s.number % 2 == team) {
+                    players = players.push(slot_row(app, lobby, slot));
+                }
             }
-            let name = if slot.status == 0 {
-                "Open slot".into()
-            } else if slot.status == 1 {
-                "Closed slot".into()
-            } else if slot.computer {
-                "Computer".into()
-            } else if slot.name.is_empty() {
-                format!("Player {}", slot.number + 1)
-            } else {
-                slot.name.clone()
-            };
-            // Levels are shown in the Players section, not squeezed beside the name.
-            let name = text(name).size(15).width(Fill);
-            let mut item = row![muted(format!("{:02}", slot.number + 1)).width(30), name]
-            .spacing(8)
-            .align_y(Alignment::Center);
-            if slot.status == 2 && !slot.computer && !slot.name.is_empty() {
-                item = item.push(level_badge(app, &slot.name));
+            let watchers: Vec<_> = lobby.slots.iter().filter(|s| s.observer && !s.own).collect();
+            if !watchers.is_empty() {
+                players = players.push(container(text("Observers").size(15).color(p::GOLD)).padding([6, 0]));
+                for slot in watchers {
+                    players = players.push(slot_row(app, lobby, slot));
+                }
             }
-            if slot.observer {
-                item = item.push(muted("Observer"));
+        } else {
+            for slot in lobby.slots.iter().filter(|s| !s.own) {
+                players = players.push(slot_row(app, lobby, slot));
             }
-            let choices = lobby.slot_actions(slot.number);
-            if !choices.is_empty() {
-                item = item.push(
-                    container(select(
-                        app,
-                        Menu::Slot(slot.number),
-                        "Slot".into(),
-                        choices.into_iter().map(|(action, request)| {
-                            (action.label().into(), Message::Slot(request))
-                        }),
-                    ))
-                    .width(88),
-                );
-            }
-            if slot.status == 2 && !slot.computer {
-                let target = lobby.kick_target(slot.number);
-                item = item.push(super::widgets::optional_action(
-                    "Kick",
-                    target.clone().map(Message::Kick),
-                ));
-                item = item.push(super::widgets::optional_action(
-                    "Ban",
-                    target.map(Message::Ban),
-                ));
-            }
-            let mut entry = column![item].spacing(8);
-            if let Some((pending, reason)) = &app.ban_prompt
-                && slot.status == 2
-                && lobby.kick_target(slot.number).as_ref() == Some(pending)
-            {
-                entry = entry.push(ban_prompt(pending.name(), reason));
-            }
-            players = players.push(container(entry).padding([9, 0]));
         }
         (
             lobby.name.clone(),

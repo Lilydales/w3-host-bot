@@ -43,6 +43,26 @@ pub fn candidates(root: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
+/// Newest replay (`*.w3g`, any name) in the standard replay folders. Some setups save
+/// matches under their own names (or into `Autosaved`) instead of `LastReplay.w3g`.
+fn newest_any(root: &Path) -> Option<PathBuf> {
+    let mut folders: Vec<PathBuf> = candidates(root)
+        .into_iter()
+        .filter_map(|p| p.parent().map(Path::to_path_buf))
+        .collect();
+    let extra: Vec<PathBuf> = folders.iter().map(|f| f.join("Autosaved")).collect();
+    folders.extend(extra);
+    folders
+        .into_iter()
+        .filter_map(|folder| std::fs::read_dir(folder).ok())
+        .flat_map(|entries| entries.flatten())
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|e| e.eq_ignore_ascii_case("w3g")))
+        .filter_map(|path| Some((std::fs::metadata(&path).ok()?.modified().ok()?, path)))
+        .max_by_key(|(modified, _)| *modified)
+        .map(|(_, path)| path)
+}
+
 /// Newest `LastReplay.w3g` under the standard Warcraft III folders.
 pub fn auto_find() -> Option<PathBuf> {
     let root = super::maps::documents_directory()?.join("Warcraft III");
@@ -155,12 +175,27 @@ fn wait_and_read(folder: Option<PathBuf>, since: Option<SystemTime>) -> Result<S
         }
     };
     let mut seen = None;
-    for _ in 0..20 {
-        let path = folder
+    let root = super::maps::documents_directory().map(|d| d.join("Warcraft III"));
+    // Warcraft III writes the replay when it leaves the score screen, which can take a
+    // while after the match ends (or until the game is closed). Keep looking for 3 minutes.
+    for _ in 0..180 {
+        let last = folder
             .as_ref()
             .map(|folder| folder.join(FILE_NAME))
             .filter(|path| path.is_file())
             .or_else(auto_find);
+        // Any other fresh replay (custom name, Autosaved) counts too.
+        let other = folder
+            .as_ref()
+            .and_then(|f| f.parent().and_then(|p| p.parent()).map(Path::to_path_buf))
+            .or_else(|| root.clone())
+            .and_then(|r| newest_any(&r))
+            .or_else(|| root.as_deref().and_then(newest_any))
+            .filter(|p| fresh(p));
+        let path = match &last {
+            Some(path) if fresh(path) => Some(path.clone()),
+            _ => other.or(last),
+        };
         if let Some(path) = &path
             && fresh(path)
         {
@@ -177,7 +212,11 @@ fn wait_and_read(folder: Option<PathBuf>, since: Option<SystemTime>) -> Result<S
     }
     Err(ReplayError::Missing(match seen {
         Some(path) => format!("{} was not updated by this match.", path.display()),
-        None => format!("{FILE_NAME} was not found."),
+        None => format!(
+            "No replay was found under {} (looked for {FILE_NAME} and any .w3g in Replay/Replays).",
+            root.map(|r| r.display().to_string())
+                .unwrap_or_else(|| "Documents\\Warcraft III".into())
+        ),
     }))
 }
 
