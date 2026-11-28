@@ -2,8 +2,10 @@ use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-const REPOSITORY: &str = "https://github.com/shideneyu/ghost-reforged";
-const API: &str = "https://api.github.com/repos/shideneyu/ghost-reforged/releases?per_page=30";
+/// This fork's releases. Never the upstream project: an upstream release must not
+/// replace this build.
+const REPOSITORY: &str = "https://github.com/Lilydales/w3-host-bot";
+const API: &str = "https://api.github.com/repos/Lilydales/w3-host-bot/releases?per_page=30";
 const SETUP: &str = "GHost-Reforged-Setup-x64.exe";
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,9 +1,9 @@
-param([string]$Version = 'v0.2.5', [string]$InstallDirectory, [switch]$NoShortcut)
+param([string]$Version = 'latest', [string]$InstallDirectory, [switch]$NoShortcut)
 & {
     param($ReleaseVersion, $Destination, $SkipShortcut)
     $ErrorActionPreference = 'Stop'
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-    $repository = 'shideneyu/ghost-reforged'
+    $repository = 'Lilydales/w3-host-bot'
     if ($ReleaseVersion -eq 'latest') {
         $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repository/releases/latest"
         $ReleaseVersion = $release.tag_name

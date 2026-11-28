@@ -22,7 +22,7 @@ function Invoke-Setup([string]$Directory, [switch]$Shortcut, [int]$ExpectedExit 
 # Replace only the download boundary; the downloaded installer runs normally.
 function Invoke-WebRequest {
     param([string]$Uri, [string]$OutFile, [switch]$UseBasicParsing)
-    $base = 'https://github.com/shideneyu/ghost-reforged/releases/download/' + $global:GHostInstallFixture.Tag + '/'
+    $base = 'https://github.com/Lilydales/w3-host-bot/releases/download/' + $global:GHostInstallFixture.Tag + '/'
     Assert-True ($Uri.StartsWith($base, [StringComparison]::Ordinal)) 'Unexpected download URL.'
     $name = $Uri.Substring($base.Length)
     Assert-True ($name -in @('SHA256SUMS', 'GHost-Reforged-Setup-x64.exe')) 'Unexpected release asset.'
@@ -44,7 +44,7 @@ function Invoke-WebRequest {
 
 function Invoke-RestMethod {
     param([string]$Uri)
-    Assert-True ($Uri -eq 'https://api.github.com/repos/shideneyu/ghost-reforged/releases/latest') 'Unexpected API request.'
+    Assert-True ($Uri -eq 'https://api.github.com/repos/Lilydales/w3-host-bot/releases/latest') 'Unexpected API request.'
     [pscustomobject]@{ tag_name = $global:GHostInstallFixture.Tag }
 }
 
@@ -90,7 +90,7 @@ try {
     $online = if ($OnlineScript) { $OnlineScript } else { Join-Path $PSScriptRoot 'install-online.ps1' }
     $global:GHostInstallFixture.Mode = 'valid'
     $onlineDirectory = Join-Path $testRoot 'Online [test]'
-    & $online -InstallDirectory $onlineDirectory -NoShortcut
+    & $online -Version $global:GHostInstallFixture.Tag -InstallDirectory $onlineDirectory -NoShortcut
     Assert-True ((Get-FileHash -LiteralPath (Join-Path $onlineDirectory 'ghost-reforged.exe')).Hash -eq $expectedHash) 'Online installation differs from release.'
     & $online -Version latest -InstallDirectory $onlineDirectory -NoShortcut
     Write-Output 'PASS: Pinned and latest online install with file-based checksum download.'

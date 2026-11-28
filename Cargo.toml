@@ -1,12 +1,12 @@
 [package]
 name = "ghost-reforged"
-version = "0.25.1"
+version = "0.25.2"
 edition = "2024"
 license = "Apache-2.0"
 description = "GHost Reforged — configurable Warcraft III auto host"
 default-run = "ghost-reforged"
 autobins = false
-repository = "https://github.com/shideneyu/ghost-reforged"
+repository = "https://github.com/Lilydales/w3-host-bot"
 
 [features]
 default = ["launcher"]

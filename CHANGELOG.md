@@ -7,6 +7,13 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.25.2 - 2026-11-28
+
+### Changed
+- **The update check now uses this fork's releases** (`Lilydales/w3-host-bot`) instead of the upstream `shideneyu/ghost-reforged`. When a newer release is published here, the bot shows "Update available" and installs it with one click (same checks as before: the setup asset must come from this repository's release download URL and match GitHub's SHA-256 digest). An upstream release can no longer replace this build. `src/launcher/updates.rs`.
+- Online installer (`install.ps1`) downloads from this repository and installs the latest release by default; README download links point to the latest release here; `Cargo.toml` `repository` updated. Installer test fixtures follow.
+- Bumped the bot and Windows installer to 0.25.2. Not compiled in the editing environment.
+
 ## 0.25.1 - 2026-11-28
 
 ### Fixed

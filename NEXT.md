@@ -25,7 +25,6 @@ Add new ideas at the bottom of the right section. Keep each item short: what, wh
 - **Auto-login**: declined for now (plain-text password risk; Battle.net login is a web page). If revisited: Windows Credential Manager, and a protocol log of a real sign-in first.
 
 ## Maintenance
-- **Updater points upstream** (`shideneyu/ghost-reforged` in `src/launcher/updates.rs`, `install-online.ps1`, README links). Point to `Lilydales/w3-host-bot` or turn the updater off, or an upstream release may overwrite this fork.
 - **CI actions still `@v4`** in `.github/workflows/*.yml` (Node 20 warning). Move to `checkout@v6`, `cache@v5`, `upload-artifact@v6` (patch bump).
 - **README is out of date**: says `ban.txt` (now `bans.json`), game build 3.0.0.24268 vs `Config::default()` 3.0.1.24371, no mention of Play-as-host, DS filter, replays.
 - **Remove the temporary protocol logger** (`src/protocol_log.rs`, calls in `src/transport.rs`) when investigation is finished.
