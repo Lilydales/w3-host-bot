@@ -187,7 +187,7 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
             .text_size(14)
             .on_toggle(Message::PlaySounds),
         muted(format!(
-            "Put .wav files with these names in the sounds folder; missing files are silent. {}",
+            "Default sounds are installed in the sounds folder. Replace a file with your own .wav (same name) or delete it to silence that cue. {}",
             super::sounds::Sound::ALL
                 .iter()
                 .map(|s| format!("{} ({})", s.file_name(), s.when()))

@@ -7,6 +7,12 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.27.0 - 2026-11-28
+
+### Added
+- **Default sound pack built in.** The 8 sounds (`hosting_started`, `lobby_created`, `player_joined`, `player_left`, `chat`, `game_started`, `game_ended`, `player_kicked`) are now part of the exe (`assets/sounds/*.wav`, ~1 MB). On start the launcher copies each one into `%LOCALAPPDATA%\GHostReforged\sounds\` once: so installing (setup or online installer), a portable exe and updates all get them. Your own file with the same name is never overwritten, and a sound you delete is not put back (`.defaults-installed` remembers what was copied). README and Options text updated. Test: `defaults_are_installed_once_and_never_over_your_own_or_after_a_delete`.
+- Bumped the bot and Windows installer to 0.27.0. Not compiled in the editing environment.
+
 ## 0.26.1 - 2026-11-28
 
 ### Fixed

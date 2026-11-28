@@ -44,6 +44,20 @@ impl Sound {
         }
     }
 
+    /// The built-in sound shipped inside the exe (`assets/sounds`).
+    fn default_bytes(self) -> &'static [u8] {
+        match self {
+            Sound::HostingStarted => include_bytes!("../../assets/sounds/hosting_started.wav"),
+            Sound::LobbyCreated => include_bytes!("../../assets/sounds/lobby_created.wav"),
+            Sound::PlayerJoined => include_bytes!("../../assets/sounds/player_joined.wav"),
+            Sound::PlayerLeft => include_bytes!("../../assets/sounds/player_left.wav"),
+            Sound::Chat => include_bytes!("../../assets/sounds/chat.wav"),
+            Sound::GameStarted => include_bytes!("../../assets/sounds/game_started.wav"),
+            Sound::GameEnded => include_bytes!("../../assets/sounds/game_ended.wav"),
+            Sound::PlayerKicked => include_bytes!("../../assets/sounds/player_kicked.wav"),
+        }
+    }
+
     pub fn when(self) -> &'static str {
         match self {
             Sound::HostingStarted => "Host clicked",
@@ -62,18 +76,40 @@ pub fn folder(data: &Path) -> PathBuf {
     data.join("sounds")
 }
 
-/// Creates the folder and a short README listing the file names. Errors are ignored:
-/// sounds are optional.
+/// Remembers which built-in sounds were already put in the folder, so a file you delete
+/// (to silence that cue) is not put back on the next start.
+const INSTALLED: &str = ".defaults-installed";
+
+/// Creates the folder, copies each built-in sound once (never over your own file), and
+/// writes a short README listing the file names. Errors are ignored: sounds are optional.
 pub fn prepare(data: &Path) {
     let dir = folder(data);
     if std::fs::create_dir_all(&dir).is_err() {
         return;
     }
+    let marker = dir.join(INSTALLED);
+    let done = std::fs::read_to_string(&marker).unwrap_or_default();
+    let mut record = done.clone();
+    for sound in Sound::ALL {
+        let name = sound.file_name();
+        if done.lines().any(|line| line == name) {
+            continue;
+        }
+        let path = dir.join(name);
+        if path.exists() || std::fs::write(&path, sound.default_bytes()).is_ok() {
+            record.push_str(name);
+            record.push('\n');
+        }
+    }
+    if record != done {
+        let _ = std::fs::write(&marker, record);
+    }
     let readme = dir.join("README.txt");
     if !readme.exists() {
         let mut text = String::from(
-            "GHost Reforged sounds\r\n\r\nPut .wav files (PCM WAV) with these exact names here. \
-             Missing files are silent.\r\n\r\n",
+            "GHost Reforged sounds\r\n\r\nThe default sounds are installed here once. Replace a \
+             file with your own .wav (PCM WAV, same name) to change it, or delete it to \
+             silence that cue (it is not put back). Missing files are silent.\r\n\r\n",
         );
         for sound in Sound::ALL {
             text.push_str(&format!("{:<22} {}\r\n", sound.file_name(), sound.when()));
@@ -131,6 +167,26 @@ fn play_file(_: &Path) {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn defaults_are_installed_once_and_never_over_your_own_or_after_a_delete() {
+        let dir = tempfile::tempdir().unwrap();
+        let sounds = folder(dir.path());
+        std::fs::create_dir_all(&sounds).unwrap();
+        std::fs::write(sounds.join("chat.wav"), b"mine").unwrap();
+        prepare(dir.path());
+        for sound in Sound::ALL {
+            assert!(sounds.join(sound.file_name()).is_file());
+        }
+        assert_eq!(std::fs::read(sounds.join("chat.wav")).unwrap(), b"mine", "your file is kept");
+        assert_eq!(
+            std::fs::read(sounds.join("lobby_created.wav")).unwrap(),
+            Sound::LobbyCreated.default_bytes()
+        );
+        std::fs::remove_file(sounds.join("player_left.wav")).unwrap();
+        prepare(dir.path());
+        assert!(!sounds.join("player_left.wav").exists(), "a deleted sound stays deleted");
+    }
 
     #[test]
     fn missing_files_are_silent_and_the_readme_lists_every_name() {
