@@ -83,7 +83,7 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
                             .on_toggle(Message::AutoQuit),
                         delay_stepper(profile.auto_quit_delay_seconds),
                         column![
-                            muted("Your position (Direct Strike maps only)"),
+                            muted("Your seat (Direct Strike maps only)"),
                             select(
                                 app,
                                 Menu::Seat,
@@ -246,7 +246,7 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
 
 /// Seat menu: map default, random, then the first 12 colours (Direct Strike uses
 /// at most these; the map locks the rest).
-fn seat_choices() -> Vec<(String, Message)> {
+pub(super) fn seat_choices() -> Vec<(String, Message)> {
     use ghost_reforged::config::Seat;
     [Seat::Default, Seat::Random]
         .into_iter()

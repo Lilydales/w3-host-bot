@@ -146,6 +146,7 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
             ]
             .spacing(24),
             ds_filter(app),
+            seat_picker(app),
         ]
         .spacing(12)
         .into()
@@ -346,6 +347,35 @@ fn status_bar<'a>(app: &'a App, controls: iced::widget::Row<'a, Message>) -> Ele
         .center_y(bg::STATUS_HEIGHT)
         .style(p::panel),
     )
+}
+
+/// "Your seat" only matters when playing as host on a Direct Strike map.
+fn seat_applies(app: &App) -> bool {
+    let profile = &app.form.profile;
+    profile.player_host
+        && profile
+            .map
+            .as_deref()
+            .is_some_and(ghost_reforged::config::is_direct_strike_map)
+}
+
+/// Host settings → Your seat (Direct Strike, Play as host). Live: a change moves you now.
+fn seat_picker(app: &App) -> Element<'_, Message> {
+    if !seat_applies(app) {
+        return column![].into();
+    }
+    column![
+        muted("Your seat (Direct Strike)"),
+        select(
+            app,
+            Menu::Seat,
+            app.form.profile.seat.label(),
+            super::options_view::seat_choices(),
+        ),
+        muted("Random = a free colour other than red, picked again for each lobby."),
+    ]
+    .spacing(4)
+    .into()
 }
 
 /// Small game tools under the Game view button: "Stop also exits W3" (live, saved
@@ -590,8 +620,8 @@ pub(super) fn settings_rows(app: &App) -> Vec<(&'static str, String)> {
     {
         rows.push(("Map type", "Other (DS features off)".into()));
     }
-    if profile.player_host && profile.seat != ghost_reforged::config::Seat::Default {
-        rows.push(("Seat", profile.seat.label()));
+    if seat_applies(app) {
+        rows.push(("Your seat", profile.seat.label()));
     }
     if profile.player_host {
         rows.push((

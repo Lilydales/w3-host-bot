@@ -34,7 +34,7 @@ This fork of [shideneyu/ghost-reforged](https://github.com/shideneyu/ghost-refor
 
 ## Temporary diagnostics: W3 protocol logging
 
-Investigation only. Every text frame exchanged with Warcraft III's local UI WebSocket is printed to the console and appended to `w3-protocol.log` (current working directory; override with `W3_PROTOCOL_LOG_PATH`). RECV frames are logged before deserialization, SEND frames are the exact serialized frame. Keys containing password/token/cookie/secret/authorization/ticket are redacted. 
+Investigation only, **off by default** (enable with `W3_PROTOCOL_LOG=1`). When on, each text frame exchanged with Warcraft III's local UI WebSocket is written as one compact line to `w3-protocol.log` (repeats of the same frame skipped; capped at 5 MB, rotated once to `w3-protocol.previous.log`) (current working directory; override with `W3_PROTOCOL_LOG_PATH`). RECV frames are logged before deserialization, SEND frames are the exact serialized frame. Keys containing password/token/cookie/secret/authorization/ticket are redacted. 
 
 Disable: set `W3_PROTOCOL_LOG=0`. Remove: delete `src/protocol_log.rs`, the `pub mod protocol_log;` line in `src/lib.rs`, and the four `protocol_log::` calls in `src/transport.rs` (marked `TEMP`).
 

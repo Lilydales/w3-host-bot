@@ -7,6 +7,21 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.24.0 - 2026-11-28
+
+### Added
+- **"Your seat" in Host settings** (Hosting page → Edit ▾), shown when Play as host is on and the map is Direct Strike: Map default, Random (not red) or a colour. Live: a change moves you now. The folded settings always show "Your seat". The same menu stays in Options → Play as host.
+
+### Fixed
+- **"DS lookup for you" shown twice.** Creating the lobby reset the lookup state while the first lookup was still running, so a second one started and both answers were shown. The host's own lookup is now tracked separately from the per-lobby reset and reported once. Test: `a_new_lobby_does_not_repeat_the_hosts_lookup_line`.
+- Bumped the bot and Windows installer to 0.24.0. Not compiled in the editing environment.
+
+## 0.23.1 - 2026-11-28
+
+### Fixed
+- **`w3-protocol.log` grew to ~50 MB per match.** The protocol logger is now off by default; set `W3_PROTOCOL_LOG=1` to turn it on for an investigation. When on it writes one compact line per frame (no pretty JSON, no console echo), skips a frame identical to the previous one of the same type (the repeated lobby/score updates), and caps the file at 5 MB with one rotation to `w3-protocol.previous.log`. The normal `logs\hosting.log` (important events only, 2 MB cap) is unchanged. `src/protocol_log.rs`.
+- Bumped the bot and Windows installer to 0.23.1. Not compiled in the editing environment.
+
 ## 0.23.0 - 2026-11-28
 
 ### Added

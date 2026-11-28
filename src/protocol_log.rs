@@ -1,12 +1,24 @@
-//! TEMPORARY diagnostic logger for the Warcraft III local UI WebSocket.
-//! Remove: delete this file, `pub mod protocol_log;` in lib.rs and the
-//! `protocol_log::` calls in transport.rs. Disable without removing: set
-//! `W3_PROTOCOL_LOG=0` before starting. Log file: `w3-protocol.log` in the
-//! current working directory (override with `W3_PROTOCOL_LOG_PATH`).
+//! Diagnostic logger for the Warcraft III local UI WebSocket.
+//! OFF by default (it grew to ~50 MB per match). Turn on only when investigating:
+//! set `W3_PROTOCOL_LOG=1` before starting. When on:
+//! - one compact line per frame (no pretty-printing, no console echo),
+//! - a frame identical to the previous one of the same type is skipped,
+//! - the file is capped at 5 MB and rotated once to `w3-protocol.previous.log`.
+//! Log file: `w3-protocol.log` in the current working directory
+//! (override with `W3_PROTOCOL_LOG_PATH`).
 use serde_json::Value;
-use std::{fs::OpenOptions, io::Write, sync::Mutex, time::SystemTime};
+use std::{
+    collections::HashMap,
+    fs::{self, OpenOptions},
+    io::Write,
+    sync::Mutex,
+    time::SystemTime,
+};
 
-static FILE_LOCK: Mutex<()> = Mutex::new(());
+/// Last logged body per (direction, type), to skip repeats.
+static LAST: Mutex<Option<HashMap<String, u64>>> = Mutex::new(None);
+
+const MAX_BYTES: u64 = 5 * 1024 * 1024;
 
 const SECRET_WORDS: &[&str] = &[
     "password", "passwd", "token", "cookie", "secret", "authorization",
@@ -14,7 +26,7 @@ const SECRET_WORDS: &[&str] = &[
 ];
 
 fn enabled() -> bool {
-    std::env::var("W3_PROTOCOL_LOG").map_or(true, |v| v != "0")
+    std::env::var("W3_PROTOCOL_LOG").is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("on"))
 }
 
 fn is_secret(key: &str) -> bool {
@@ -77,21 +89,28 @@ pub fn log(direction: &str, raw: &str) {
                 .unwrap_or("<unknown>")
                 .to_owned();
             redact(&mut v);
-            (kind, serde_json::to_string_pretty(&v).unwrap_or_else(|_| raw.into()))
+            (kind, v.to_string())
         }
-        Err(e) => ("<NON-JSON>".to_owned(), format!("(invalid JSON: {e})\n{raw}")),
+        Err(e) => ("<NON-JSON>".to_owned(), format!("(invalid JSON: {e}) {}", raw.replace(['\r', '\n'], " "))),
     };
-    let ts = timestamp();
-    let line = "=".repeat(60);
-    let entry = format!(
-        "{line}\n{ts}\nDIRECTION: {direction}\nTYPE: {kind}\n\n{body}\n{line}\n"
-    );
-    println!(
-        "[W3-PROTOCOL][{}][{direction}]\nType: {kind}\nRaw:\n{body}",
-        &ts[11..]
-    );
+    let mut guard = LAST.lock().unwrap_or_else(|e| e.into_inner());
+    let last = guard.get_or_insert_with(HashMap::new);
+    let hash = {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        body.hash(&mut h);
+        h.finish()
+    };
+    if last.insert(format!("{direction} {kind}"), hash) == Some(hash) {
+        return; // same as the previous frame of this type
+    }
     let path = std::env::var("W3_PROTOCOL_LOG_PATH").unwrap_or_else(|_| "w3-protocol.log".into());
-    let _guard = FILE_LOCK.lock();
+    if fs::metadata(&path).is_ok_and(|m| m.len() >= MAX_BYTES) {
+        let previous = path.trim_end_matches(".log").to_owned() + ".previous.log";
+        let _ = fs::remove_file(&previous);
+        let _ = fs::rename(&path, &previous);
+    }
+    let entry = format!("{} {direction} {kind} {body}\n", timestamp());
     if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
         let _ = file.write_all(entry.as_bytes());
     }

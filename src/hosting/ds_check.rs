@@ -38,6 +38,9 @@ pub(super) struct DsCheck {
     verdicts: std::collections::BTreeMap<String, Lookup>,
     /// The host's own BattleTag, looked up for display only (never filtered or kicked).
     own: Option<String>,
+    /// The host's own lookup still running. Not cleared by `reset`, so a new lobby
+    /// does not start a second lookup (and a second Activity line) while one is running.
+    own_flight: Option<String>,
     /// Why a lookup ended as it did ("HTTP 403"...), shown in Activity for failures.
     notes: (Sender<(String, String)>, Receiver<(String, String)>),
 }
@@ -56,6 +59,7 @@ impl Default for DsCheck {
             last_sent: None,
             verdicts: Default::default(),
             own: None,
+            own_flight: None,
             notes: mpsc::channel(),
         }
     }
@@ -123,7 +127,11 @@ impl DsCheck {
     /// Looks up the host's own stats once per lobby, so the launcher can show them and the
     /// host can see the lookup works. The answer is never used to kick or announce.
     pub fn lookup_self(&mut self, config: &Config, name: &str) {
-        if !config.is_direct_strike() || !name.contains('#') || self.own.as_deref() == Some(name) {
+        if !config.is_direct_strike()
+            || !name.contains('#')
+            || self.own.as_deref() == Some(name)
+            || self.own_flight.as_deref() == Some(name)
+        {
             return;
         }
         let (sender, notes, tag, patch) = (
@@ -142,6 +150,7 @@ impl DsCheck {
             .is_ok()
         {
             self.own = Some(name.to_owned());
+            self.own_flight = Some(name.to_owned());
         }
     }
 
@@ -191,7 +200,10 @@ impl DsCheck {
         }
         while let Ok((name, result)) = self.results.try_recv() {
             let note = notes.remove(&name).unwrap_or_default();
-            if self.own.as_deref() == Some(name.as_str()) && !self.pending.contains(&name) {
+            if self.own_flight.as_deref() == Some(name.as_str()) && !self.pending.contains(&name) {
+                // Reported once; counts as this lobby's lookup even if the lobby changed.
+                self.own_flight = None;
+                self.own = Some(name.clone());
                 // Display only: the host is never filtered, kicked or announced.
                 let detail = match result {
                     Lookup::Found(s) => format!("Lv. {} ({} matches)", s.level, s.matches),
@@ -476,11 +488,33 @@ mod tests {
         let mut check = DsCheck::default();
         let (events, received) = mpsc::channel();
         check.own = Some("Me#1".into());
+        check.own_flight = Some("Me#1".into());
         check.sender.send(("Me#1".into(), Lookup::NotFound)).unwrap();
         let strict = Config { min_ds_level: 50, ..Config::default() };
         check.poll(&strict, 1, &events, &mut Announcements::default());
         assert!(check.kicks.is_empty() && check.messages.is_empty());
         let all: Vec<_> = received.try_iter().collect();
         assert!(all.iter().any(|e| matches!(e, Event::DsStats(n, None) if n == "Me#1")));
+    }
+
+    #[test]
+    fn a_new_lobby_does_not_repeat_the_hosts_lookup_line() {
+        let mut check = DsCheck::default();
+        let (events, received) = mpsc::channel();
+        // Lookup started, then the lobby was (re)created before the answer arrived.
+        check.own = Some("Me#1".into());
+        check.own_flight = Some("Me#1".into());
+        check.reset();
+        let config = Config::default(); // not Direct Strike: lookup_self would not spawn anyway
+        check.lookup_self(&config, "Me#1");
+        // A stray second answer (from an older lookup) must not be shown twice.
+        check.sender.send(("Me#1".into(), Lookup::NotFound)).unwrap();
+        check.sender.send(("Me#1".into(), Lookup::NotFound)).unwrap();
+        check.poll(&config, 1, &events, &mut Announcements::default());
+        let lines = received
+            .try_iter()
+            .filter(|e| matches!(e, Event::Activity(Activity::Command(l)) if l.starts_with("DS lookup for you")))
+            .count();
+        assert_eq!(lines, 1);
     }
 }
