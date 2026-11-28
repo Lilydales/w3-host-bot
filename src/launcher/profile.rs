@@ -76,6 +76,12 @@ pub struct Profile {
     /// Stop Hosting also closes Warcraft III. Changeable at any time from the status bar.
     #[serde(default)]
     pub exit_game_on_stop: bool,
+    /// Play as host, Direct Strike maps only: the host's position in each lobby.
+    #[serde(default)]
+    pub seat: ghost_reforged::config::Seat,
+    /// Play the optional .wav cues from the sounds folder.
+    #[serde(default = "private_by_default")]
+    pub play_sounds: bool,
 }
 
 pub const MAX_EARLY_LEAVE_MINUTES: u32 = 30;
@@ -196,6 +202,8 @@ impl Default for Profile {
             focus_on_start: true,
             refocus_after_launch: true,
             exit_game_on_stop: false,
+            seat: Default::default(),
+            play_sounds: true,
         }
     }
 }
@@ -229,6 +237,7 @@ impl Profile {
             welcome: self.welcome.clone(),
             min_ds_level: self.min_ds_level,
             min_ds_matches: self.min_ds_matches,
+            seat: if self.player_host { self.seat } else { Default::default() },
         }
     }
 

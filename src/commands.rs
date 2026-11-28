@@ -7,7 +7,8 @@ mod settings;
 pub use settings::{ChatCommand, CommandSettings};
 mod color;
 mod info;
-pub use color::ColorRequest;
+pub use color::{COLORS, ColorRequest, color_name};
+pub(crate) use color::allowed as color_allowed;
 
 #[derive(Default)]
 pub struct Context<'a> {

@@ -71,6 +71,31 @@ pub struct Config {
     pub leave_if_quit_fails: bool,
     /// Player mode: bring the game window to the front when a match starts loading.
     pub focus_on_start: bool,
+    /// Player mode, Direct Strike maps only: where the host sits in each new lobby.
+    pub seat: Seat,
+}
+
+/// The host's own position in a Direct Strike lobby (player mode).
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Seat {
+    /// Wherever Warcraft III puts the host (usually red, position 1).
+    #[default]
+    Default,
+    /// A random free colour other than red.
+    Random,
+    /// A fixed colour, `crate::commands::COLORS` index (0 = red).
+    Color(u8),
+}
+
+impl Seat {
+    pub fn label(self) -> String {
+        match self {
+            Self::Default => "Map default".into(),
+            Self::Random => "Random (not red)".into(),
+            Self::Color(color) => crate::commands::color_name(color),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
@@ -186,6 +211,7 @@ impl Default for Config {
             auto_quit_delay_seconds: 5,
             leave_if_quit_fails: false,
             focus_on_start: false,
+            seat: Seat::Default,
         }
     }
 }

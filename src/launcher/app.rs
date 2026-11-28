@@ -118,8 +118,35 @@ pub enum Message {
     ExitOnStop(bool),
     /// Options: bring the launcher back after Battle.net starts the game.
     RefocusAfterLaunch(bool),
+    /// Player mode, Direct Strike: where the host sits in each lobby.
+    Seat(ghost_reforged::config::Seat),
+    /// Left column: Recent activity or Lobby chat.
+    SideTab(SideTab),
+    ChatInput(String),
+    ChatSend,
+    PlaySounds(bool),
+    OpenSoundsFolder,
     ClearLog,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SideTab {
+    #[default]
+    Activity,
+    Chat,
+}
+
+/// One lobby chat line shown in the launcher.
+#[derive(Debug, Clone)]
+pub struct ChatLine {
+    pub time: String,
+    pub sender: String,
+    pub text: String,
+    pub own: bool,
+}
+
+/// Chat lines kept in memory.
+pub const CHAT_LINES: usize = 200;
 
 #[derive(Debug, Clone, Copy)]
 pub enum WindowAction {
@@ -281,6 +308,13 @@ pub struct App {
     pub(super) exiting_game: bool,
     /// Bringing the launcher back after a game launch.
     pub(super) refocus: Option<super::game_controls::Refocus>,
+    pub(super) side_tab: SideTab,
+    /// Newest first.
+    pub(super) chat_lines: VecDeque<ChatLine>,
+    pub(super) chat_input: String,
+    /// Chat lines that arrived while Recent activity was shown.
+    pub(super) chat_unread: usize,
+    pub(super) sounds: super::sounds::Sounds,
 }
 
 impl App {
@@ -350,7 +384,13 @@ impl App {
             exit_after_stop: false,
             exiting_game: false,
             refocus: None,
+            side_tab: SideTab::Activity,
+            chat_lines: VecDeque::new(),
+            chat_input: String::new(),
+            chat_unread: 0,
+            sounds: super::sounds::Sounds::new(directory),
         };
+        super::sounds::prepare(directory);
         // Nothing to fill in: start with the settings folded away.
         app.settings_open = !app.settings_complete();
         app.log("Launcher opened.");
@@ -364,6 +404,11 @@ impl App {
                 .form
                 .read()
                 .is_ok_and(|profile| profile.map.as_deref().is_some_and(|map| map.is_file()))
+    }
+
+    pub(super) fn sound(&mut self, sound: super::sounds::Sound) {
+        let enabled = self.form.profile.play_sounds;
+        self.sounds.play(sound, enabled);
     }
 
     pub(super) fn log(&mut self, line: &str) {
@@ -516,6 +561,9 @@ impl App {
                 if result.is_ok() {
                     self.settings_open = false;
                     self.start_refocus();
+                    self.chat_lines.clear();
+                    self.chat_unread = 0;
+                    self.sound(super::sounds::Sound::HostingStarted);
                 }
                 self.notify(result, "");
             }
@@ -639,6 +687,38 @@ impl App {
             Message::AutoQuit(value) => self.form.profile.auto_quit = value,
             Message::AutoQuitDelay(value) => self.form.profile.auto_quit_delay_seconds = value.min(60),
             Message::FocusOnStart(value) => self.form.profile.focus_on_start = value,
+            Message::Seat(value) => {
+                self.motion.close_menus();
+                self.form.profile.seat = value;
+                self.apply_settings();
+            }
+            Message::SideTab(tab) => {
+                self.side_tab = tab;
+                if tab == SideTab::Chat {
+                    self.chat_unread = 0;
+                }
+            }
+            Message::ChatInput(value) => {
+                self.chat_input = value.chars().filter(|c| !c.is_control()).take(240).collect();
+            }
+            Message::ChatSend => {
+                let text = self.chat_input.trim().to_owned();
+                if !text.is_empty()
+                    && let Some(worker) = &self.worker
+                {
+                    worker.send(Control::Chat(text));
+                    self.chat_input.clear();
+                }
+            }
+            Message::PlaySounds(value) => {
+                self.form.profile.play_sounds = value;
+                let _ = self.save();
+            }
+            Message::OpenSoundsFolder => {
+                let folder = super::sounds::folder(&self.data_directory);
+                super::sounds::prepare(&self.data_directory);
+                let _ = std::process::Command::new("explorer").arg(&folder).spawn();
+            }
             Message::Speed(value) => {
                 self.form.profile.speed = value;
                 self.motion.close_menus();

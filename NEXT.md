@@ -20,6 +20,8 @@ Add new ideas at the bottom of the right section. Keep each item short: what, wh
 - **Close-button choice** (from W3Champions): first time the window is closed, ask "Minimise to tray or quit?" with "remember my choice"; warn "You are in an active game" before quitting mid-match.
 - **Close Battle.net and Warcraft III** together (W3Champions has this action), e.g. as an option on Exit W3.
 - **Game session line** (from W3Champions' "Game Session: Lobby / Loading / Running / Ended"): one short state chip in the status bar instead of mixed status text.
+- **Seat: check the DS colour layout.** `seat.rs` assumes `availableTeamColors` lists each team's colours. If "Your position" does not move you, send a `w3-protocol.log` from a DS lobby.
+- **Background music** (looping track while idle/in lobby). Needs a mixer (PlaySound plays one sound at a time, so music would cut off cues).
 - **Auto-login**: declined for now (plain-text password risk; Battle.net login is a web page). If revisited: Windows Credential Manager, and a protocol log of a real sign-in first.
 
 ## Maintenance

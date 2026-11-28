@@ -26,6 +26,7 @@ mod process;
 mod profile;
 mod replays;
 mod select;
+mod sounds;
 mod storage;
 #[cfg(test)]
 mod tests;

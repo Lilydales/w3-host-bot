@@ -96,6 +96,10 @@ impl Chat {
         self.replies = Default::default();
         self.color = None;
     }
+    /// Queues a line typed in the launcher; sent with the bot's own replies.
+    pub fn say(&mut self, text: &str, elapsed: Duration) {
+        self.replies.push(text, elapsed.as_millis() as u64);
+    }
     pub fn warning(&mut self) -> Option<String> {
         self.history.warning()
     }

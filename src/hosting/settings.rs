@@ -13,6 +13,8 @@ pub struct LiveSettings {
     /// Direct Strike filter minimums (0 = off). Changing them re-checks the current lobby.
     pub min_ds_level: u32,
     pub min_ds_matches: u32,
+    /// Player mode, Direct Strike: the host's position. A change moves the host now.
+    pub seat: crate::config::Seat,
 }
 
 impl LiveSettings {
@@ -22,6 +24,7 @@ impl LiveSettings {
             || self.empty_refresh > 86400
             || self.min_ds_level > 100_000
             || self.min_ds_matches > 1_000_000
+            || matches!(self.seat, crate::config::Seat::Color(c) if c as usize >= crate::commands::COLORS.len())
         {
             return Err("Hosting settings are outside supported bounds.".into());
         }
@@ -37,6 +40,7 @@ impl LiveSettings {
         engine.config.welcome = self.welcome.clone();
         engine.config.min_ds_level = self.min_ds_level;
         engine.config.min_ds_matches = self.min_ds_matches;
+        engine.config.seat = self.seat;
         Ok(())
     }
 }

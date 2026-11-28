@@ -71,6 +71,7 @@ pub(super) fn run(
     let mut observer_trim = slots::ObserverTrim::default();
     let mut ds = super::ds_check::DsCheck::default();
     let mut end_watch = super::end_watch::EndWatch::default();
+    let mut seat = super::seat::SeatPicker::default();
     let mut focused_game = false;
     loop {
         let step = supervision::attempt(|| -> Result<Step, String> {
@@ -186,6 +187,39 @@ pub(super) fn run(
                 };
                 let _ = tx.send(Event::Activity(Activity::Command(line.into())));
             }
+            if let Some(Control::Chat(text)) = &control {
+                let lobby_open = matches!(
+                    engine.phase,
+                    Phase::Lobby | Phase::Countdown(_) | Phase::Starting(_)
+                ) && engine.owned_lobby(now).is_some();
+                if !lobby_open {
+                    let _ = tx.send(Event::Activity(Activity::Command(
+                        "Chat · only in the lobby (Warcraft III does not allow it during a match)".into(),
+                    )));
+                } else {
+                    chat.say(text, started.elapsed());
+                }
+            }
+            if let Some(event) = &event
+                && event["messageType"] == "ChatMessage"
+                && event["payload"]["message"]["source"] == "gameChat"
+                && let (Some(sender), Some(text)) = (
+                    event["payload"]["message"]["sender"].as_str(),
+                    event["payload"]["message"]["content"].as_str(),
+                )
+            {
+                let me = engine
+                    .owned_lobby(now)
+                    .and_then(|lobby| lobby.local())
+                    .map(|p| p.name.clone());
+                let base = |name: &str| name.split('#').next().unwrap_or(name).to_owned();
+                let own = me.is_some_and(|me| me == sender || base(&me) == base(sender));
+                let _ = tx.send(Event::Chat {
+                    sender: sender.to_owned(),
+                    text: text.to_owned(),
+                    own,
+                });
+            }
             if let Some(Control::Kick(target)) = &control {
                 manual_kick.request(target.clone(), &engine, now);
             }
@@ -242,6 +276,16 @@ pub(super) fn run(
                 ds.kick(&engine, &mut manual_kick, now);
             }
             commands.extend(end_watch.step(&engine, game.pid(), now, tx));
+            let (seat_move, seat_line) =
+                seat.step(&engine, identity_ok && manual_kick.idle() && slot_edit.idle(), now);
+            if let Some(command) = seat_move {
+                commands.push(command);
+                // Ask for the roster so the move is confirmed promptly.
+                commands.push(Command::empty("SendGameLobbySetup"));
+            }
+            if let Some(line) = seat_line {
+                let _ = tx.send(Event::Activity(Activity::Command(line)));
+            }
             // Player mode: bring the game forward once per match, as it starts loading.
             if engine.phase != Phase::InGame {
                 focused_game = false;

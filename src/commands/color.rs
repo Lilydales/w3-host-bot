@@ -28,13 +28,25 @@ pub const COLORS: [&str; 24] = [
     "peanut",
 ];
 
+/// "Blue (2)": colour name with its position number, for menus and Activity.
+pub fn color_name(color: u8) -> String {
+    match COLORS.get(color as usize) {
+        Some(name) => {
+            let mut chars = name.chars();
+            let first = chars.next().map(|c| c.to_ascii_uppercase()).unwrap_or_default();
+            format!("{first}{} ({})", chars.as_str(), color + 1)
+        }
+        None => format!("Colour {}", color + 1),
+    }
+}
+
 pub struct ColorRequest {
     lobby: String,
     player: Player,
     color: u8,
 }
 
-fn allowed(lobby: &Lobby, player: &Player, color: u8) -> bool {
+pub(crate) fn allowed(lobby: &Lobby, player: &Player, color: u8) -> bool {
     if !player.color_change_enabled
         || player.is_observer
         || player.team == OBSERVER_TEAM

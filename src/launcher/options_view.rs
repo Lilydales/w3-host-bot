@@ -82,6 +82,21 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
                             .text_size(14)
                             .on_toggle(Message::AutoQuit),
                         delay_stepper(profile.auto_quit_delay_seconds),
+                        column![
+                            muted("Your position (Direct Strike maps only)"),
+                            select(
+                                app,
+                                Menu::Seat,
+                                profile.seat.label(),
+                                seat_choices(),
+                            ),
+                            muted(
+                                "Moves you to this colour in each new lobby; Random picks a free \
+                                 colour other than red. Changing it while hosting moves you now. \
+                                 If the colour is taken or locked by the map, you stay put."
+                            ),
+                        ]
+                        .spacing(6),
                         muted(
                             "Direct Strike maps only. The bot watches the game window for the \
                              VICTORY/DEFEAT panel, waits the time above, then leaves the game and \
@@ -153,6 +168,22 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
         rule::horizontal(1),
         early_leavers(app),
         rule::horizontal(1),
+        text("Sounds").size(20),
+        toggler(profile.play_sounds)
+            .label("Play sounds")
+            .size(21)
+            .text_size(14)
+            .on_toggle(Message::PlaySounds),
+        muted(format!(
+            "Put .wav files with these names in the sounds folder; missing files are silent. {}",
+            super::sounds::Sound::ALL
+                .iter()
+                .map(|s| format!("{} ({})", s.file_name(), s.when()))
+                .collect::<Vec<_>>()
+                .join(" · ")
+        )),
+        super::widgets::action("Open sounds folder", Message::OpenSoundsFolder, true),
+        rule::horizontal(1),
         text("Direct Strike filter").size(20),
         muted(
             "Direct Strike maps only. Players with a BattleTag are looked up on ds-report.com when they join. \
@@ -211,6 +242,17 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
         .height(Fill)
         .style(p::panel),
     )
+}
+
+/// Seat menu: map default, random, then the first 12 colours (Direct Strike uses
+/// at most these; the map locks the rest).
+fn seat_choices() -> Vec<(String, Message)> {
+    use ghost_reforged::config::Seat;
+    [Seat::Default, Seat::Random]
+        .into_iter()
+        .chain((0..12).map(Seat::Color))
+        .map(|seat| (seat.label(), Message::Seat(seat)))
+        .collect()
 }
 
 /// Observer slots left open in a player-host lobby; the map's other observer slots are closed.

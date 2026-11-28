@@ -9,6 +9,7 @@ pub enum Menu {
     StartRule,
     Speed,
     Slot(u8),
+    Seat,
 }
 
 impl Menu {
@@ -18,6 +19,7 @@ impl Menu {
             Self::StartRule => 1,
             Self::Speed => 2,
             Self::Slot(slot) => 3 + usize::from(slot.min(23)),
+            Self::Seat => 27,
         }
     }
 }
@@ -67,7 +69,7 @@ pub struct Motion {
     pub page: Tween,
     pub pending_page: Option<Page>,
     pub modal: Tween,
-    pub menus: [Tween; 27],
+    pub menus: [Tween; 28],
 }
 
 impl Default for Motion {
@@ -80,7 +82,7 @@ impl Default for Motion {
             page,
             pending_page: None,
             modal: Tween::settled(0.0),
-            menus: [Tween::settled(0.0); 27],
+            menus: [Tween::settled(0.0); 28],
         }
     }
 }

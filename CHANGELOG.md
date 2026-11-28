@@ -7,6 +7,18 @@ Versioning (semver, `MAJOR.MINOR.PATCH`): every change set bumps the version.
 Bump it in 4 places: `Cargo.toml`, `Cargo.lock` (package `ghost-reforged`),
 `packaging/windows/setup/Cargo.toml`, `packaging/windows/setup/Cargo.lock`.
 
+## 0.23.0 - 2026-11-28
+
+### Added
+- **Your position (Direct Strike, Play as host).** Options → Play as host → "Your position": Map default, Random (not red), or a colour (Red (1) … Brown (12)). In each new lobby the bot moves you there: `SetColor` within your team, `SetTeam` first for the other team (Direct Strike moves players to the slot of the chosen colour). Up to 4 tries, then Activity says why it stayed ("is taken", "not available on this map"). Random picks a free colour other than red that you can reach. Changing it while hosting moves you right away (live setting). Other maps and observer hosting are untouched. `src/hosting/seat.rs`, `config::Seat`, profile field `seat`.
+- **Lobby chat in the bot.** The left column has tabs "Recent activity | Lobby chat (n)". Chat shows lobby messages (newest first, your own in gold) and a box + Send to talk in the lobby. Sending uses the bot's chat queue (`Control::Chat` → `SendGameChatMessage`). Lobby only: Warcraft III does not accept chat from the bot during a match; the box is disabled then. `Event::Chat`.
+- **Sound cues** (optional, nothing bundled). Folder `%LOCALAPPDATA%\GHostReforged\sounds\` (created with a README listing the names). Files: `hosting_started.wav`, `lobby_created.wav`, `player_joined.wav`, `player_left.wav`, `chat.wav` (others' messages only), `game_started.wav`, `game_ended.wav`, `player_kicked.wav`. Missing or unreadable files are silent (`PlaySoundW` with `SND_NODEFAULT`). The same cue plays at most once per 0.7 s. Options → Sounds: "Play sounds" toggle and "Open sounds folder". `src/launcher/sounds.rs`; windows-sys feature `Win32_Media_Audio`.
+
+### Changed
+- Folded host settings show "Seat" when a position is chosen.
+- Tests: seat moves (`a_colour_on_the_own_team_is_one_set_color`, `a_colour_on_the_other_team_starts_with_a_team_change`, `random_never_picks_red_or_a_taken_colour`), `missing_files_are_silent_and_the_readme_lists_every_name`.
+- Bumped the bot and Windows installer to 0.23.0. Not compiled in the editing environment.
+
 ## 0.22.1 - 2026-11-28
 
 ### Fixed

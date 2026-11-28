@@ -393,6 +393,7 @@ fn live_settings_change_the_current_lobby_without_recreating_it() {
         },
         min_ds_level: 7,
         min_ds_matches: 40,
+        seat: Default::default(),
     };
     let commands = dispatch(
         &mut engine,

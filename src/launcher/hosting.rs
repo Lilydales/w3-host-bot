@@ -63,6 +63,7 @@ impl App {
             auto_quit_delay_seconds: p.auto_quit_delay_seconds,
             leave_if_quit_fails: p.leave_if_quit_fails,
             focus_on_start: p.player_host && p.focus_on_start,
+            seat: if p.player_host { p.seat } else { Default::default() },
             ..Config::default()
         };
         self.worker = Some(Worker::start(config)?);
@@ -129,8 +130,30 @@ impl App {
                     self.lobby = Some(lobby);
                 }
                 Event::LobbyCleared => self.lobby = None,
-                Event::Kicked(name, reason) => self.record_kick(name, reason),
-                Event::MatchEnded => self.match_ended(),
+                Event::Kicked(name, reason) => {
+                    self.sound(super::sounds::Sound::PlayerKicked);
+                    self.record_kick(name, reason)
+                }
+                Event::MatchEnded => {
+                    self.sound(super::sounds::Sound::GameEnded);
+                    self.match_ended()
+                }
+                Event::Chat { sender, text, own } => {
+                    if !own {
+                        self.sound(super::sounds::Sound::Chat);
+                    }
+                    if self.side_tab != super::app::SideTab::Chat {
+                        self.chat_unread += 1;
+                    }
+                    let seconds = self.started.elapsed().as_secs();
+                    self.chat_lines.push_front(super::app::ChatLine {
+                        time: format!("{:02}:{:02}", seconds / 60, seconds % 60),
+                        sender,
+                        text,
+                        own,
+                    });
+                    self.chat_lines.truncate(super::app::CHAT_LINES);
+                }
                 Event::DsStats(name, stats) => {
                     self.ds_failed.remove(&name);
                     self.ds_stats.insert(name, stats);
@@ -225,6 +248,14 @@ impl App {
     }
 
     pub(super) fn record_activity(&mut self, event: Activity) {
+        use super::sounds::Sound;
+        match &event {
+            Activity::LobbyCreated(_) => self.sound(Sound::LobbyCreated),
+            Activity::Joined(_) => self.sound(Sound::PlayerJoined),
+            Activity::Left(_) => self.sound(Sound::PlayerLeft),
+            Activity::GameStarted(_) => self.sound(Sound::GameStarted),
+            Activity::Command(_) => {}
+        }
         match event {
             Activity::LobbyCreated(name) => {
                 // Keep the host's own stats and the last game's, which its card still shows.

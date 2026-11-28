@@ -8,6 +8,7 @@ mod end_watch;
 mod controller;
 mod kick;
 mod repair;
+mod seat;
 pub use kick::KickRequest;
 mod slots;
 pub use slots::{SlotAction, SlotRequest};
@@ -46,6 +47,8 @@ pub enum Control {
     /// Leave the running match now ("Leave game" button). The usual end-of-match
     /// handling then counts it, reads the replay and hosts the next lobby.
     LeaveGame,
+    /// Say something in lobby chat from the launcher.
+    Chat(String),
     StartRule { minimum: u8, full: bool },
     Settings(LiveSettings),
     Slot { slot: u8, open: bool },
@@ -103,6 +106,8 @@ pub enum Event {
     Kicked(String, String),
     /// The host's own match ended (player mode). The launcher times it to spot early ends.
     MatchEnded,
+    /// A lobby chat line. `own` is true for the host's own messages.
+    Chat { sender: String, text: String, own: bool },
     Reserve(u32),
     Finished(Result<(), String>),
 }

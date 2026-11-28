@@ -1,5 +1,5 @@
 use super::{
-    app::{App, Field, Message},
+    app::{App, Field, Message, SideTab},
     art::{self, Icon},
     backdrop_view as bg,
     effects,
@@ -188,16 +188,26 @@ pub fn view<'a>(app: &'a App) -> Element<'a, Message> {
             container(top.height(Length::Shrink))
                 .max_height(TOP_FOLDED_MAX)
                 .into(),
-            column![
-                iced::widget::rule::horizontal(1),
-                activity_header(),
-                scrollable(padded(activity_list(app)).width(Fill))
-                    .style(p::scrollbar)
-                    .height(Fill),
-            ]
-            .spacing(8)
-            .height(Fill)
-            .into(),
+            {
+                let mut panel = column![iced::widget::rule::horizontal(1), side_tabs(app)]
+                    .spacing(8)
+                    .height(Fill);
+                panel = match app.side_tab {
+                    SideTab::Activity => panel.push(
+                        scrollable(padded(activity_list(app)).width(Fill))
+                            .style(p::scrollbar)
+                            .height(Fill),
+                    ),
+                    SideTab::Chat => panel
+                        .push(
+                            scrollable(padded(chat_list(app)).width(Fill))
+                                .style(p::scrollbar)
+                                .height(Fill),
+                        )
+                        .push(chat_input(app)),
+                };
+                panel.into()
+            },
         )
     };
     let left = effects::frame(
@@ -579,6 +589,9 @@ pub(super) fn settings_rows(app: &App) -> Vec<(&'static str, String)> {
         .is_some_and(ghost_reforged::config::is_direct_strike_map)
     {
         rows.push(("Map type", "Other (DS features off)".into()));
+    }
+    if profile.player_host && profile.seat != ghost_reforged::config::Seat::Default {
+        rows.push(("Seat", profile.seat.label()));
     }
     if profile.player_host {
         rows.push((
@@ -1134,6 +1147,90 @@ const TOP_FOLDED_MAX: f32 = 300.0;
 /// Activity lines kept in the Hosting page list (the full log is on the Activity page).
 const ACTIVITY_LINES: usize = 60;
 
+/// "Recent activity | Lobby chat (n)" tabs, then Open log.
+fn side_tabs(app: &App) -> Element<'_, Message> {
+    let tab = |caption: String, which: SideTab| {
+        let current = app.side_tab == which;
+        effects::hover(
+            button(text(caption).size(16).color(if current { p::GOLD } else { p::MUTED }))
+                .padding([0, 4])
+                .style(p::inset)
+                .on_press_maybe((!current).then_some(Message::SideTab(which))),
+            !current,
+        )
+    };
+    let chat = if app.chat_unread > 0 {
+        format!("Lobby chat ({})", app.chat_unread)
+    } else {
+        "Lobby chat".into()
+    };
+    row![
+        tab("Recent activity".into(), SideTab::Activity),
+        muted("|"),
+        tab(chat, SideTab::Chat),
+        space().width(Fill),
+        effects::hover(
+            button(text("Open log ▸").size(14).color(p::GOLD))
+                .padding([0, 4])
+                .style(p::inset)
+                .on_press(Message::Page(super::app::Page::Activity)),
+            true,
+        )
+    ]
+    .spacing(6)
+    .align_y(Alignment::Center)
+    .into()
+}
+
+/// Lobby chat, newest first. The host's own lines are gold.
+fn chat_list(app: &App) -> Element<'_, Message> {
+    let mut list = column![].spacing(4);
+    if app.chat_lines.is_empty() {
+        list = list.push(muted(if app.worker.is_some() {
+            "No chat yet. Lobby messages appear here."
+        } else {
+            "Start hosting to see the lobby chat."
+        }));
+    }
+    for line in &app.chat_lines {
+        let name = line.sender.split('#').next().unwrap_or(&line.sender).to_owned();
+        list = list.push(
+            row![
+                muted(&line.time).width(48),
+                text(format!("{name}:"))
+                    .size(13)
+                    .color(if line.own { p::GOLD } else { p::MUTED }),
+                text(&line.text).size(13).color(p::TEXT).width(Fill),
+            ]
+            .spacing(8),
+        );
+    }
+    list.into()
+}
+
+/// Message box + Send. Lobby only: Warcraft III does not allow it during a match.
+fn chat_input(app: &App) -> Element<'_, Message> {
+    let open = app.worker.is_some() && !app.in_game && app.lobby.is_some();
+    let mut input = text_input(
+        if open { "Say something in the lobby…" } else { "Chat is available in the lobby" },
+        &app.chat_input,
+    )
+    .padding([6, 12])
+    .size(14)
+    .style(p::input);
+    if open {
+        input = input.on_input(Message::ChatInput).on_submit(Message::ChatSend);
+    }
+    row![
+        effects::skin(input, Frame::Input),
+        action("Send", Message::ChatSend, open && !app.chat_input.trim().is_empty()),
+    ]
+    .spacing(8)
+    .align_y(Alignment::Center)
+    .into()
+}
+
+#[allow(dead_code)]
 fn activity_header<'a>() -> Element<'a, Message> {
     row![
         text("Recent activity").size(16).color(p::GOLD).width(Fill),
